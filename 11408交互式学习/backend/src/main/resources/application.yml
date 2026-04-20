@@ -1,0 +1,68 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/study11408
+    username: study11408
+    password: study11408_dev
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 5000ms
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000
+
+app:
+  jwt:
+    secret: c2VjdXJlLWtleS1mb3Itc3R1ZHkxMTQwOC1wbGF0Zm9ybS1qd3QtdG9rZW4tZ2VuZXJhdGlvbi0yMDI0LXZlcnktbG9uZy1zZWNyZXQta2V5LXN0cmluZw==
+    expiration: 86400000
+    refresh-expiration: 604800000
+
+  minio:
+    endpoint: http://localhost:9000
+    access-key: minioadmin
+    secret-key: minioadmin123
+    bucket: study11408
+
+  ai:
+    service-url: http://localhost:8000
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  default-produces-media-type: application/json
+
+logging:
+  level:
+    root: INFO
+    com.study11408: DEBUG

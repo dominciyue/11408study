@@ -1,0 +1,151 @@
+import axios from "axios";
+import type {
+  ApiResponse,
+  AuthResponse,
+  LoginRequest,
+  RegisterRequest,
+  Subject,
+  Topic,
+  KnowledgeNode,
+  KnowledgeEdge,
+  GraphData,
+  Material,
+  StudyProgress,
+  QuizQuestion,
+  WrongAnswer,
+  Note,
+  StudySession,
+  StudyFeedback,
+  QuizSubmission,
+  StatsOverview,
+  User,
+} from "@/types";
+import { getToken, clearAuth } from "@/lib/auth";
+
+const api = axios.create({
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api",
+  timeout: 15000,
+  headers: { "Content-Type": "application/json" },
+});
+
+api.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response.data,
+  (error) => {
+    if (error.response?.status === 401) {
+      clearAuth();
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error.response?.data || error);
+  }
+);
+
+// ─── Auth ────────────────────────────────────────────────────────────────────
+export const authApi = {
+  login: (data: LoginRequest) =>
+    api.post<unknown, ApiResponse<AuthResponse>>("/auth/login", data),
+  register: (data: RegisterRequest) =>
+    api.post<unknown, ApiResponse<AuthResponse>>("/auth/register", data),
+  refresh: (refreshToken: string) =>
+    api.post<unknown, ApiResponse<AuthResponse>>("/auth/refresh", { refreshToken }),
+  me: () => api.get<unknown, ApiResponse<User>>("/auth/me"),
+};
+
+// ─── Subjects ────────────────────────────────────────────────────────────────
+export const subjectsApi = {
+  list: () => api.get<unknown, ApiResponse<Subject[]>>("/subjects"),
+  get: (id: number) => api.get<unknown, ApiResponse<Subject>>(`/subjects/${id}`),
+};
+
+// ─── Topics ──────────────────────────────────────────────────────────────────
+export const topicsApi = {
+  listBySubject: (subjectId: number) =>
+    api.get<unknown, ApiResponse<Topic[]>>(`/subjects/${subjectId}/topics`),
+  get: (id: number) => api.get<unknown, ApiResponse<Topic>>(`/topics/${id}`),
+};
+
+// ─── Knowledge Nodes & Edges ─────────────────────────────────────────────────
+export const knowledgeApi = {
+  getNodes: (params?: { subjectId?: number; topicId?: number; difficulty?: number }) =>
+    api.get<unknown, ApiResponse<KnowledgeNode[]>>("/knowledge/nodes", { params }),
+  getNode: (id: number) =>
+    api.get<unknown, ApiResponse<KnowledgeNode>>(`/knowledge/nodes/${id}`),
+  getEdges: (params?: { subjectId?: number }) =>
+    api.get<unknown, ApiResponse<KnowledgeEdge[]>>("/knowledge/edges", { params }),
+  getGraphData: (params?: { subjectId?: number; topicId?: number }) =>
+    api.get<unknown, ApiResponse<GraphData>>("/knowledge/graph", { params }),
+};
+
+// ─── Study ───────────────────────────────────────────────────────────────────
+export const studyApi = {
+  getProgress: () =>
+    api.get<unknown, ApiResponse<StudyProgress[]>>("/study/progress"),
+  getNodeProgress: (nodeId: number) =>
+    api.get<unknown, ApiResponse<StudyProgress>>(`/study/progress/${nodeId}`),
+  submitFeedback: (data: StudyFeedback) =>
+    api.post<unknown, ApiResponse<void>>("/study/feedback", data),
+  getReviewQueue: () =>
+    api.get<unknown, ApiResponse<KnowledgeNode[]>>("/study/review-queue"),
+  getStudyPath: (subjectId: number) =>
+    api.get<unknown, ApiResponse<KnowledgeNode[]>>(`/study/path/${subjectId}`),
+  startSession: (data: { subjectId?: number; mode: string }) =>
+    api.post<unknown, ApiResponse<StudySession>>("/study/sessions", data),
+  endSession: (sessionId: number) =>
+    api.put<unknown, ApiResponse<StudySession>>(`/study/sessions/${sessionId}/end`),
+};
+
+// ─── Quiz ────────────────────────────────────────────────────────────────────
+export const quizApi = {
+  generate: (params: { subjectId?: number; topicId?: number; count?: number }) =>
+    api.get<unknown, ApiResponse<QuizQuestion[]>>("/quiz/generate", { params }),
+  submit: (data: QuizSubmission) =>
+    api.post<unknown, ApiResponse<{ score: number; total: number; wrongAnswers: WrongAnswer[] }>>(
+      "/quiz/submit",
+      data
+    ),
+  getWrongAnswers: () =>
+    api.get<unknown, ApiResponse<WrongAnswer[]>>("/quiz/wrong-answers"),
+};
+
+// ─── Materials ───────────────────────────────────────────────────────────────
+export const materialsApi = {
+  list: (params?: { subjectId?: number; type?: string }) =>
+    api.get<unknown, ApiResponse<Material[]>>("/materials", { params }),
+  get: (id: number) =>
+    api.get<unknown, ApiResponse<Material>>(`/materials/${id}`),
+  upload: (formData: FormData) =>
+    api.post<unknown, ApiResponse<Material>>("/materials/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  delete: (id: number) =>
+    api.delete<unknown, ApiResponse<void>>(`/materials/${id}`),
+};
+
+// ─── Notes ───────────────────────────────────────────────────────────────────
+export const notesApi = {
+  list: (params?: { nodeId?: number }) =>
+    api.get<unknown, ApiResponse<Note[]>>("/notes", { params }),
+  create: (data: { nodeId: number; content: string; title?: string }) =>
+    api.post<unknown, ApiResponse<Note>>("/notes", data),
+  update: (id: number, data: { content: string; title?: string }) =>
+    api.put<unknown, ApiResponse<Note>>(`/notes/${id}`, data),
+  delete: (id: number) =>
+    api.delete<unknown, ApiResponse<void>>(`/notes/${id}`),
+};
+
+// ─── Stats ───────────────────────────────────────────────────────────────────
+export const statsApi = {
+  overview: () =>
+    api.get<unknown, ApiResponse<StatsOverview>>("/stats/overview"),
+};
+
+export default api;
