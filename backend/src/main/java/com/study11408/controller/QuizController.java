@@ -2,8 +2,8 @@ package com.study11408.controller;
 
 import com.study11408.dto.ApiResponse;
 import com.study11408.dto.QuizSubmitRequest;
+import com.study11408.dto.WrongAnswerDTO;
 import com.study11408.entity.QuizQuestion;
-import com.study11408.entity.WrongAnswer;
 import com.study11408.security.JwtTokenProvider;
 import com.study11408.service.QuizService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -44,7 +44,7 @@ public class QuizController {
 
     @Operation(summary = "获取错题本")
     @GetMapping("/wrong-answers")
-    public ApiResponse<List<WrongAnswer>> getWrongAnswers(HttpServletRequest request) {
+    public ApiResponse<List<WrongAnswerDTO>> getWrongAnswers(HttpServletRequest request) {
         Long userId = getUserId(request);
         return ApiResponse.ok(quizService.getWrongAnswers(userId));
     }

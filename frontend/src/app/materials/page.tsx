@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   FolderOpen,
   Upload,
@@ -15,18 +15,13 @@ import {
   Trash2,
   ExternalLink,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-
-const materials = [
-  { id: 1, title: "王道数据结构.pdf", type: "PDF", size: "45.2 MB", uploadDate: "2024-03-15", subject: "408计算机", linked: 32 },
-  { id: 2, title: "操作系统精讲笔记.pdf", type: "PDF", size: "28.7 MB", uploadDate: "2024-03-14", subject: "408计算机", linked: 18 },
-  { id: 3, title: "考研英语真题解析", type: "链接", size: "-", uploadDate: "2024-03-12", subject: "英语一", linked: 5 },
-  { id: 4, title: "高数基础强化课程", type: "视频", size: "-", uploadDate: "2024-03-10", subject: "数学一", linked: 24 },
-  { id: 5, title: "马原核心考点整理.pdf", type: "PDF", size: "12.3 MB", uploadDate: "2024-03-08", subject: "政治", linked: 15 },
-];
+import { materialsApi } from "@/lib/api";
+import type { Material } from "@/types";
 
 const typeIcon: Record<string, React.ElementType> = {
   PDF: FileText,
@@ -34,15 +29,43 @@ const typeIcon: Record<string, React.ElementType> = {
   "链接": Link2,
 };
 
-const subjectColors: Record<string, string> = {
-  "408计算机": "bg-purple-500/20 text-purple-400",
-  "英语一": "bg-blue-500/20 text-blue-400",
-  "数学一": "bg-green-500/20 text-green-400",
-  "政治": "bg-red-500/20 text-red-400",
-};
-
 export default function MaterialsPage() {
+  const router = useRouter();
   const [dragActive, setDragActive] = useState(false);
+  const [items, setItems] = useState<Material[]>([]);
+  const [query, setQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    materialsApi
+      .list()
+      .then((res) => {
+        if (!cancelled) setItems(res.data);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((m) => (m.title + " " + (m.description || "")).toLowerCase().includes(q));
+  }, [items, query]);
+
+  async function uploadFile(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("title", file.name);
+    const res = await materialsApi.upload(form);
+    setItems((prev) => [res.data, ...prev]);
+  }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -54,10 +77,20 @@ export default function MaterialsPage() {
           </h1>
           <p className="text-gray-400 mt-1">上传和管理你的学习资料</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+        <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => fileInputRef.current?.click()}>
           <Plus className="w-4 h-4 mr-2" />
           添加资料
         </Button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) uploadFile(file);
+          }}
+        />
       </div>
 
       {/* Upload area */}
@@ -67,7 +100,12 @@ export default function MaterialsPage() {
         }`}
         onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
         onDragLeave={() => setDragActive(false)}
-        onDrop={(e) => { e.preventDefault(); setDragActive(false); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragActive(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file) uploadFile(file);
+        }}
       >
         <CardContent className="p-8 text-center">
           <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-blue-500/10 flex items-center justify-center">
@@ -75,7 +113,7 @@ export default function MaterialsPage() {
           </div>
           <p className="text-gray-300 font-medium mb-1">拖拽文件到此处上传</p>
           <p className="text-sm text-gray-500 mb-4">支持 PDF、Word、图片等格式，单文件最大 100MB</p>
-          <Button variant="outline" className="border-white/[0.08]">
+          <Button variant="outline" className="border-white/[0.08]" onClick={() => fileInputRef.current?.click()}>
             <Upload className="w-4 h-4 mr-2" />
             选择文件
           </Button>
@@ -89,6 +127,8 @@ export default function MaterialsPage() {
           <Input
             placeholder="搜索资料..."
             className="pl-9 bg-white/5 border-white/[0.08]"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
           />
         </div>
         <Button variant="outline" className="border-white/[0.08] text-gray-400">
@@ -99,8 +139,18 @@ export default function MaterialsPage() {
 
       {/* Materials list */}
       <div className="space-y-2">
-        {materials.map((material) => {
-          const Icon = typeIcon[material.type] || FileText;
+        {isLoading ? (
+          <Card className="border-white/[0.06]">
+            <CardContent className="p-4 text-gray-500">加载中…</CardContent>
+          </Card>
+        ) : filtered.length === 0 ? (
+          <Card className="border-white/[0.06]">
+            <CardContent className="p-4 text-gray-500">暂无资料。</CardContent>
+          </Card>
+        ) : (
+          filtered.map((material) => {
+          const Icon = typeIcon["PDF"] || FileText;
+          const sizeMb = material.fileSize ? `${(material.fileSize / (1024 * 1024)).toFixed(1)} MB` : "-";
           return (
             <Card key={material.id} className="border-white/[0.06] hover:border-white/[0.12] transition-colors">
               <CardContent className="p-4 flex items-center gap-4">
@@ -110,30 +160,49 @@ export default function MaterialsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-200 truncate">{material.title}</p>
                   <div className="flex items-center gap-3 mt-1">
-                    <Badge variant="outline" className={subjectColors[material.subject] || ""}>{material.subject}</Badge>
                     <span className="text-xs text-gray-500">{material.type}</span>
-                    {material.size !== "-" && <span className="text-xs text-gray-500">{material.size}</span>}
-                    <span className="text-xs text-gray-500">{material.uploadDate}</span>
+                    <span className="text-xs text-gray-500">{sizeMb}</span>
+                    <span className="text-xs text-gray-500">{new Date(material.createdAt).toLocaleString()}</span>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <span>关联 {material.linked} 个知识点</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0">
                     <Eye className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0"
+                    onClick={() => window.open(material.fileUrl, "_blank")}
+                  >
                     <ExternalLink className="w-4 h-4" />
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-gray-500 hover:text-red-400 h-8 w-8 p-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-500 hover:text-purple-400 h-8 w-8 p-0"
+                    onClick={() => router.push(`/materials/import/${material.id}`)}
+                    title="AI 导入"
+                  >
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-500 hover:text-red-400 h-8 w-8 p-0"
+                    onClick={async () => {
+                      await materialsApi.delete(material.id);
+                      setItems((prev) => prev.filter((x) => x.id !== material.id));
+                    }}
+                  >
                     <Trash2 className="w-4 h-4" />
                   </Button>
                 </div>
               </CardContent>
             </Card>
           );
-        })}
+        })
+        )}
       </div>
     </div>
   );

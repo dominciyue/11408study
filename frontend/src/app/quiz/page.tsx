@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import {
   ClipboardCheck,
   Timer,
@@ -57,6 +58,7 @@ const recentResults = [
 ];
 
 export default function QuizPage() {
+  const router = useRouter();
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between">
@@ -80,6 +82,10 @@ export default function QuizPage() {
           <Card
             key={mode.title}
             className={`border ${mode.borderColor} hover:scale-[1.01] transition-all duration-300 cursor-pointer group`}
+            onClick={() => {
+              if (mode.title === "专项练习") router.push("/quiz/practice?subjectId=4");
+              if (mode.title === "错题重练") router.push("/quiz/wrong");
+            }}
           >
             <CardContent className="p-6">
               <div className="flex items-start gap-4">

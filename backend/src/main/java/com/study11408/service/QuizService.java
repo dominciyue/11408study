@@ -1,6 +1,7 @@
 package com.study11408.service;
 
 import com.study11408.dto.QuizSubmitRequest;
+import com.study11408.dto.WrongAnswerDTO;
 import com.study11408.entity.QuizQuestion;
 import com.study11408.entity.User;
 import com.study11408.entity.WrongAnswer;
@@ -63,7 +64,24 @@ public class QuizService {
         return result;
     }
 
-    public List<WrongAnswer> getWrongAnswers(Long userId) {
-        return wrongAnswerRepository.findByUserIdAndResolvedFalse(userId);
+    public List<WrongAnswerDTO> getWrongAnswers(Long userId) {
+        return wrongAnswerRepository.findByUserIdAndResolvedFalse(userId).stream()
+                .map(this::toWrongAnswerDTO)
+                .toList();
+    }
+
+    private WrongAnswerDTO toWrongAnswerDTO(WrongAnswer wrongAnswer) {
+        QuizQuestion q = wrongAnswer.getQuestion();
+        return WrongAnswerDTO.builder()
+                .id(wrongAnswer.getId())
+                .questionId(wrongAnswer.getQuestionId())
+                .nodeId(q != null ? q.getNodeId() : null)
+                .questionText(q != null ? q.getContent() : null)
+                .userAnswer(wrongAnswer.getUserAnswer())
+                .correctAnswer(q != null ? q.getAnswer() : null)
+                .explanation(q != null ? q.getExplanation() : null)
+                .answeredAt(wrongAnswer.getAnsweredAt())
+                .resolved(wrongAnswer.getResolved())
+                .build();
     }
 }

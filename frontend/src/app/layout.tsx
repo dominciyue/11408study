@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "11408 考研学习平台",
   description: "交互式考研复习平台 - 政治、英语一、数学一、408计算机综合",
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({

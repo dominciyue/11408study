@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:27-dind
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Cache Maven
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.m2/wrapper
+          key: ${{ runner.os }}-m2-${{ hashFiles('backend/pom.xml') }}
+      - name: Download Maven Wrapper jar
+        run: |
+          mkdir -p backend/.mvn/wrapper
+          curl -fsSL -o backend/.mvn/wrapper/maven-wrapper.jar https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.3.2/maven-wrapper-3.3.2.jar
+      - name: Run backend tests (Testcontainers)
+        working-directory: backend
+        run: |
+          java "-Dmaven.multiModuleProjectDirectory=${{ github.workspace }}/backend" \
+            -classpath ./.mvn/wrapper/maven-wrapper.jar \
+            org.apache.maven.wrapper.MavenWrapperMain -q test -U
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install
+        working-directory: frontend
+        run: npm ci
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  ai-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ai-service/requirements.txt
+      - name: Install
+        working-directory: ai-service
+        run: pip install -r requirements.txt
+      - name: Pytest
+        working-directory: ai-service
+        run: pytest -q
+

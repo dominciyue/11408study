@@ -1,7 +1,10 @@
 package com.study11408.service;
 
+import com.study11408.dto.StatsOverviewDTO;
+import com.study11408.dto.SubjectProgressDTO;
 import com.study11408.entity.StudyProgress;
 import com.study11408.entity.StudySession;
+import com.study11408.entity.Subject;
 import com.study11408.entity.WrongAnswer;
 import com.study11408.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -9,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -20,6 +24,7 @@ public class StatsService {
     private final StudySessionRepository sessionRepository;
     private final WrongAnswerRepository wrongAnswerRepository;
     private final KnowledgeNodeRepository nodeRepository;
+    private final SubjectRepository subjectRepository;
 
     public Map<String, Object> getOverview(Long userId) {
         List<StudyProgress> progressList = progressRepository.findByUserId(userId);
@@ -48,6 +53,110 @@ public class StatsService {
         overview.put("completionRate", totalNodes > 0 ? Math.round((double) studiedNodes / totalNodes * 10000.0) / 100.0 : 0);
 
         return overview;
+    }
+
+    public StatsOverviewDTO getOverviewV2(Long userId) {
+        List<StudyProgress> progressList = progressRepository.findByUserIdWithNodeSubject(userId);
+        List<StudySession> sessions = sessionRepository.findByUserIdOrderByStartTimeDesc(userId);
+
+        long totalNodes = nodeRepository.count();
+        long studiedNodes = progressList.size();
+        long masteredNodes = progressList.stream()
+                .filter(p -> p.getMasteryLevel() != null && p.getMasteryLevel() >= 80)
+                .count();
+        double avgMastery = progressList.stream()
+                .mapToInt(p -> p.getMasteryLevel() == null ? 0 : p.getMasteryLevel())
+                .average()
+                .orElse(0.0);
+
+        long totalStudyMinutes = sessions.stream()
+                .filter(s -> s.getEndTime() != null)
+                .mapToLong(s -> java.time.Duration.between(s.getStartTime(), s.getEndTime()).toMinutes())
+                .sum();
+
+        LocalDate today = LocalDate.now(ZoneId.systemDefault());
+        long studiedToday = sessions.stream()
+                .filter(s -> s.getStartTime() != null && s.getStartTime().toLocalDate().equals(today))
+                .mapToLong(s -> s.getStudiedNodes() == null ? 0 : s.getStudiedNodes())
+                .sum();
+        long reviewedToday = sessions.stream()
+                .filter(s -> s.getStartTime() != null && s.getStartTime().toLocalDate().equals(today))
+                .mapToLong(s -> s.getReviewedNodes() == null ? 0 : s.getReviewedNodes())
+                .sum();
+        long studyTimeTodayMinutes = sessions.stream()
+                .filter(s -> s.getStartTime() != null && s.getStartTime().toLocalDate().equals(today))
+                .filter(s -> s.getEndTime() != null)
+                .mapToLong(s -> java.time.Duration.between(s.getStartTime(), s.getEndTime()).toMinutes())
+                .sum();
+
+        Map<LocalDate, List<StudySession>> sessionsByDay = sessions.stream()
+                .filter(s -> s.getStartTime() != null)
+                .collect(Collectors.groupingBy(s -> s.getStartTime().toLocalDate()));
+
+        int streakDays = 0;
+        for (int i = 0; i < 365; i++) {
+            LocalDate day = today.minusDays(i);
+            List<StudySession> daySessions = sessionsByDay.getOrDefault(day, Collections.emptyList());
+            boolean studied = daySessions.stream().anyMatch(s -> {
+                if (s.getEndTime() == null) return false;
+                long minutes = java.time.Duration.between(s.getStartTime(), s.getEndTime()).toMinutes();
+                return minutes > 0 || (s.getStudiedNodes() != null && s.getStudiedNodes() > 0) || (s.getReviewedNodes() != null && s.getReviewedNodes() > 0);
+            });
+            if (!studied) break;
+            streakDays++;
+        }
+
+        List<Long> weeklyStudyTimeMinutes = new ArrayList<>();
+        for (int i = 6; i >= 0; i--) {
+            LocalDate day = today.minusDays(i);
+            long minutes = sessionsByDay.getOrDefault(day, Collections.emptyList()).stream()
+                    .filter(s -> s.getEndTime() != null)
+                    .mapToLong(s -> java.time.Duration.between(s.getStartTime(), s.getEndTime()).toMinutes())
+                    .sum();
+            weeklyStudyTimeMinutes.add(minutes);
+        }
+
+        List<Subject> subjects = subjectRepository.findAllByOrderBySortOrderAsc();
+        Map<Long, List<StudyProgress>> progressBySubjectId = progressList.stream()
+                .filter(p -> p.getNode() != null && p.getNode().getTopic() != null && p.getNode().getTopic().getSubject() != null)
+                .collect(Collectors.groupingBy(p -> p.getNode().getTopic().getSubject().getId()));
+
+        List<SubjectProgressDTO> subjectProgress = subjects.stream().map(subject -> {
+            long subjectTotalNodes = nodeRepository.countByTopicSubjectId(subject.getId());
+            List<StudyProgress> subjectProgressList = progressBySubjectId.getOrDefault(subject.getId(), Collections.emptyList());
+            long subjectStudied = subjectProgressList.size();
+            long subjectMastered = subjectProgressList.stream()
+                    .filter(p -> p.getMasteryLevel() != null && p.getMasteryLevel() >= 80)
+                    .count();
+            double progressPercent = subjectTotalNodes > 0
+                    ? Math.round(((double) subjectStudied / subjectTotalNodes) * 10000.0) / 100.0
+                    : 0.0;
+
+            return SubjectProgressDTO.builder()
+                    .subjectId(subject.getId())
+                    .name(subject.getName())
+                    .code(subject.getCode())
+                    .color(subject.getColor())
+                    .progress(progressPercent)
+                    .totalNodes(subjectTotalNodes)
+                    .studiedNodes(subjectStudied)
+                    .masteredNodes(subjectMastered)
+                    .build();
+        }).collect(Collectors.toList());
+
+        return StatsOverviewDTO.builder()
+                .totalNodes(totalNodes)
+                .studiedNodes(studiedNodes)
+                .masteredNodes(masteredNodes)
+                .averageMastery(Math.round(avgMastery * 100.0) / 100.0)
+                .totalStudyMinutes(totalStudyMinutes)
+                .studiedToday(studiedToday)
+                .reviewedToday(reviewedToday)
+                .studyTimeTodayMinutes(studyTimeTodayMinutes)
+                .streakDays(streakDays)
+                .weeklyStudyTimeMinutes(weeklyStudyTimeMinutes)
+                .subjectProgress(subjectProgress)
+                .build();
     }
 
     public List<Map<String, Object>> getDailyStats(Long userId) {

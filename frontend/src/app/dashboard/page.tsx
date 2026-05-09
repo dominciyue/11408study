@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
@@ -16,64 +16,64 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useAuthStore } from "@/stores/auth-store";
+import { statsApi } from "@/lib/api";
+import type { StatsOverview } from "@/types";
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
 
-const subjects = [
-  {
-    name: "政治",
-    code: "politics",
-    color: "from-red-500/20 to-red-600/5",
-    borderColor: "border-red-500/20",
-    textColor: "text-red-400",
-    barColor: "bg-red-500",
-    progress: 35,
-    topics: 12,
-    mastered: 42,
-  },
-  {
-    name: "英语一",
-    code: "english",
-    color: "from-blue-500/20 to-blue-600/5",
-    borderColor: "border-blue-500/20",
-    textColor: "text-blue-400",
-    barColor: "bg-blue-500",
-    progress: 28,
-    topics: 8,
-    mastered: 31,
-  },
-  {
-    name: "数学一",
-    code: "math",
-    color: "from-green-500/20 to-green-600/5",
-    borderColor: "border-green-500/20",
-    textColor: "text-green-400",
-    barColor: "bg-green-500",
-    progress: 45,
-    topics: 15,
-    mastered: 67,
-  },
-  {
-    name: "408计算机",
-    code: "cs408",
-    color: "from-purple-500/20 to-purple-600/5",
-    borderColor: "border-purple-500/20",
-    textColor: "text-purple-400",
-    barColor: "bg-purple-500",
-    progress: 22,
-    topics: 20,
-    mastered: 28,
-  },
-];
-
-const todayStats = [
-  { label: "已学习", value: "12", icon: CheckCircle2, color: "text-green-400" },
-  { label: "待复习", value: "8", icon: RotateCcw, color: "text-orange-400" },
-  { label: "学习时长", value: "2.5h", icon: Clock, color: "text-blue-400" },
-  { label: "连续天数", value: "7", icon: Flame, color: "text-red-400" },
-];
+function minutesToHoursText(minutes: number) {
+  if (!Number.isFinite(minutes)) return "0h";
+  const h = minutes / 60;
+  if (h < 1) return `${Math.max(0, Math.round(minutes))}m`;
+  return `${h.toFixed(1)}h`;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuthStore();
+  const [overview, setOverview] = useState<StatsOverview | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    statsApi
+      .overview()
+      .then((res) => {
+        if (!cancelled) setOverview(res.data);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const todayStats = useMemo(() => {
+    const studiedToday = overview?.studiedToday ?? 0;
+    const reviewedToday = overview?.reviewedToday ?? 0;
+    const minutesToday = overview?.studyTimeTodayMinutes ?? 0;
+    const streakDays = overview?.streakDays ?? 0;
+    return [
+      { label: "已学习", value: String(studiedToday), icon: CheckCircle2, color: "text-green-400" },
+      { label: "待复习", value: String(reviewedToday), icon: RotateCcw, color: "text-orange-400" },
+      { label: "学习时长", value: minutesToHoursText(minutesToday), icon: Clock, color: "text-blue-400" },
+      { label: "连续天数", value: String(streakDays), icon: Flame, color: "text-red-400" },
+    ];
+  }, [overview]);
+
+  const weeklyChartData = useMemo(() => {
+    const arr = overview?.weeklyStudyTimeMinutes ?? [];
+    return arr.map((m, idx) => ({ day: `D${idx + 1}`, minutes: m }));
+  }, [overview]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -81,14 +81,14 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">
-            你好，{user?.nickname || user?.username || "同学"} 👋
+            你好，{user?.nickname || user?.username || "同学"}
           </h1>
           <p className="text-gray-400 mt-1">今天也要加油学习哦！坚持就是胜利</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500/10 border border-orange-500/20">
             <Flame className="w-5 h-5 text-orange-400" />
-            <span className="text-orange-400 font-bold text-lg">7</span>
+            <span className="text-orange-400 font-bold text-lg">{overview?.streakDays ?? 0}</span>
             <span className="text-orange-400/70 text-sm">天连续</span>
           </div>
         </div>
@@ -103,7 +103,7 @@ export default function DashboardPage() {
                 <stat.icon className={`w-5 h-5 ${stat.color}`} />
               </div>
               <div>
-                <p className="text-2xl font-bold text-white">{stat.value}</p>
+                <p className="text-2xl font-bold text-white">{isLoading ? "…" : stat.value}</p>
                 <p className="text-xs text-gray-500">{stat.label}</p>
               </div>
             </CardContent>
@@ -118,26 +118,28 @@ export default function DashboardPage() {
           学科进度
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {subjects.map((subject) => (
+          {(overview?.subjectProgress ?? []).map((subject) => (
             <Card
               key={subject.code}
-              className={`border ${subject.borderColor} bg-gradient-to-br ${subject.color} hover:border-opacity-40 transition-all duration-300 cursor-pointer`}
+              className="border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-white/[0.02] hover:border-white/[0.16] transition-all duration-300 cursor-pointer"
               onClick={() => router.push(`/subjects/${subject.code}`)}
             >
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className={`text-lg font-semibold ${subject.textColor}`}>{subject.name}</h3>
-                  <span className="text-sm text-gray-400">{subject.topics} 个专题</span>
+                  <h3 className="text-lg font-semibold text-gray-100">{subject.name}</h3>
+                  <span className="text-sm text-gray-400">
+                    {subject.studiedNodes}/{subject.totalNodes}
+                  </span>
                 </div>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">已掌握 {subject.mastered} 个知识点</span>
-                    <span className={subject.textColor}>{subject.progress}%</span>
+                    <span className="text-gray-400">已掌握 {subject.masteredNodes} 个</span>
+                    <span className="text-gray-200">{subject.progress}%</span>
                   </div>
                   <Progress
                     value={subject.progress}
                     className="h-2"
-                    indicatorClassName={subject.barColor}
+                    indicatorClassName="bg-blue-500"
                   />
                 </div>
               </CardContent>
@@ -191,16 +193,25 @@ export default function DashboardPage() {
         <h2 className="text-lg font-semibold text-gray-200 mb-4">学习趋势</h2>
         <Card className="border-white/[0.06]">
           <CardHeader>
-            <CardTitle className="text-base text-gray-300">每周学习时长</CardTitle>
+            <CardTitle className="text-base text-gray-300">每周学习时长（分钟）</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-48 flex items-center justify-center text-gray-600 text-sm">
-              <div className="text-center">
-                <div className="w-16 h-16 mx-auto mb-3 rounded-xl bg-white/5 flex items-center justify-center">
-                  <TrendingUp className="w-8 h-8 text-gray-600" />
-                </div>
-                <p>图表功能将在后续版本实现</p>
-              </div>
+            <div className="h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={weeklyChartData}>
+                  <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 12 }} />
+                  <YAxis tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "rgba(15, 23, 42, 0.9)",
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      color: "rgba(255,255,255,0.9)",
+                    }}
+                  />
+                  <Bar dataKey="minutes" fill="rgba(59, 130, 246, 0.85)" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>

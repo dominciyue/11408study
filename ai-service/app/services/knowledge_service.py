@@ -144,7 +144,7 @@ class KnowledgeService:
     ) -> list[dict]:
         type_names = {
             "CHOICE": "选择题（单选，包含4个选项A/B/C/D）",
-            "TRUE_FALSE": "判断题（答案为"正确"或"错误"）",
+            "TRUE_FALSE": "判断题（答案为“正确”或“错误”）",
             "FILL_BLANK": "填空题（用____标记空白处）",
         }
         type_desc = type_names.get(question_type, type_names["CHOICE"])

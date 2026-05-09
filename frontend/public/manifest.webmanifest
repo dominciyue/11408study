@@ -1,0 +1,11 @@
+{
+  "name": "11408 考研学习平台",
+  "short_name": "11408",
+  "description": "交互式知识图谱 + 学习路径 + 复习队列 + 测验",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "icons": []
+}
+

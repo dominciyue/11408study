@@ -110,6 +110,11 @@ public class StudyPathService {
         return progressRepository.findByUserId(userId);
     }
 
+    public StudyProgress getNodeProgress(Long userId, Long nodeId) {
+        return progressRepository.findByUserIdAndNodeId(userId, nodeId)
+                .orElseThrow(() -> new BusinessException("学习进度不存在", HttpStatus.NOT_FOUND));
+    }
+
     private KnowledgeNodeDTO toNodeDTO(KnowledgeNode node) {
         return KnowledgeNodeDTO.builder()
                 .id(node.getId())

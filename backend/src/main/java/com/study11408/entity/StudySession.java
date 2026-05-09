@@ -24,6 +24,17 @@ public class StudySession {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column(name = "subject_id", insertable = false, updatable = false)
+    private Long subjectId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subject_id")
+    private Subject subject;
+
+    @Builder.Default
+    @Column(name = "mode", nullable = false, length = 50)
+    private String mode = "free";
+
     @Column(name = "start_time", nullable = false)
     private LocalDateTime startTime;
 

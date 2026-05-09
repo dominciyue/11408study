@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   StickyNote,
   Plus,
@@ -13,54 +13,45 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-
-const notes = [
-  {
-    id: 1,
-    title: "KMP算法核心思想",
-    content: "KMP算法通过构建next数组避免重复比较，时间复杂度O(n+m)...",
-    linkedNode: "KMP字符串匹配",
-    subject: "数据结构",
-    updatedAt: "2小时前",
-    tags: ["算法", "字符串"],
-  },
-  {
-    id: 2,
-    title: "虚拟内存与页面置换",
-    content: "虚拟内存将物理内存扩展到磁盘，常见页面置换算法：FIFO, LRU, OPT...",
-    linkedNode: "虚拟内存管理",
-    subject: "操作系统",
-    updatedAt: "昨天",
-    tags: ["内存管理"],
-  },
-  {
-    id: 3,
-    title: "TCP拥塞控制四个阶段",
-    content: "慢开始、拥塞避免、快重传、快恢复...",
-    linkedNode: "TCP拥塞控制",
-    subject: "计算机网络",
-    updatedAt: "3天前",
-    tags: ["TCP", "传输层"],
-  },
-  {
-    id: 4,
-    title: "矩阵特征值分解笔记",
-    content: "特征值方程 Ax = λx，其中 λ 为特征值，x 为特征向量...",
-    linkedNode: "特征值与特征向量",
-    subject: "线性代数",
-    updatedAt: "1周前",
-    tags: ["线性代数", "矩阵"],
-  },
-];
-
-const subjectColors: Record<string, string> = {
-  "数据结构": "text-purple-400",
-  "操作系统": "text-purple-400",
-  "计算机网络": "text-purple-400",
-  "线性代数": "text-green-400",
-};
+import { notesApi } from "@/lib/api";
+import type { Note } from "@/types";
 
 export default function NotesPage() {
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [query, setQuery] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoading(true);
+    notesApi
+      .list()
+      .then((res) => {
+        if (!cancelled) setNotes(res.data);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return notes;
+    return notes.filter((n) => (n.title + " " + n.content).toLowerCase().includes(q));
+  }, [notes, query]);
+
+  async function createNote() {
+    const title = window.prompt("标题");
+    if (!title) return;
+    const content = window.prompt("内容");
+    if (!content) return;
+    const res = await notesApi.create({ nodeId: 1, title, content });
+    setNotes((prev) => [res.data, ...prev]);
+  }
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between">
@@ -71,7 +62,7 @@ export default function NotesPage() {
           </h1>
           <p className="text-gray-400 mt-1">记录学习心得，关联知识图谱</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+        <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={createNote}>
           <Plus className="w-4 h-4 mr-2" />
           新建笔记
         </Button>
@@ -82,11 +73,22 @@ export default function NotesPage() {
         <Input
           placeholder="搜索笔记..."
           className="pl-9 bg-white/5 border-white/[0.08]"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
         />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {notes.map((note) => (
+        {isLoading ? (
+          <Card className="border-white/[0.06]">
+            <CardContent className="p-5 text-gray-500">加载中…</CardContent>
+          </Card>
+        ) : filtered.length === 0 ? (
+          <Card className="border-white/[0.06]">
+            <CardContent className="p-5 text-gray-500">暂无笔记。</CardContent>
+          </Card>
+        ) : (
+          filtered.map((note) => (
           <Card
             key={note.id}
             className="border-white/[0.06] hover:border-white/[0.12] transition-all cursor-pointer group"
@@ -102,25 +104,26 @@ export default function NotesPage() {
               </div>
               <p className="text-sm text-gray-400 line-clamp-2 mb-3">{note.content}</p>
               <div className="flex items-center gap-2 mb-3">
-                {note.tags.map((tag) => (
-                  <Badge key={tag} variant="outline" className="text-xs bg-white/5 border-white/[0.08] text-gray-400">
+                {note.subjectName ? (
+                  <Badge variant="outline" className="text-xs bg-white/5 border-white/[0.08] text-gray-400">
                     <Tag className="w-3 h-3 mr-1" />
-                    {tag}
+                    {note.subjectName}
                   </Badge>
-                ))}
+                ) : null}
               </div>
               <div className="flex items-center justify-between text-xs text-gray-500">
-                <span className={subjectColors[note.subject] || "text-gray-400"}>
-                  {note.subject} · {note.linkedNode}
+                <span className="text-gray-400">
+                  {(note.nodeTitle || note.topicName || "未关联知识点")}
                 </span>
                 <span className="flex items-center gap-1">
                   <Clock className="w-3 h-3" />
-                  {note.updatedAt}
+                  {new Date(note.updatedAt).toLocaleString()}
                 </span>
               </div>
             </CardContent>
           </Card>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

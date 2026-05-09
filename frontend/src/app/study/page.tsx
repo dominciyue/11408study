@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
@@ -15,49 +15,14 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { statsApi, studyApi } from "@/lib/api";
 
-const studyModes = [
-  {
-    title: "智能推荐",
-    description: "基于你的学习进度和薄弱点，AI 智能推荐今日学习内容",
-    icon: Sparkles,
-    color: "text-purple-400",
-    bgColor: "bg-purple-500/10",
-    borderColor: "border-purple-500/20",
-    badge: "推荐",
-    badgeColor: "bg-purple-500/20 text-purple-400",
-  },
-  {
-    title: "复习队列",
-    description: "基于间隔重复算法（SM-2），自动生成今日复习队列",
-    icon: RotateCcw,
-    color: "text-orange-400",
-    bgColor: "bg-orange-500/10",
-    borderColor: "border-orange-500/20",
-    badge: "8 待复习",
-    badgeColor: "bg-orange-500/20 text-orange-400",
-  },
-  {
-    title: "学习路径",
-    description: "按知识图谱拓扑排序，从基础到进阶系统化学习",
-    icon: Route,
-    color: "text-blue-400",
-    bgColor: "bg-blue-500/10",
-    borderColor: "border-blue-500/20",
-    badge: "系统学习",
-    badgeColor: "bg-blue-500/20 text-blue-400",
-  },
-  {
-    title: "自由学习",
-    description: "自由选择学科和知识点，按自己的节奏学习",
-    icon: BookOpen,
-    color: "text-green-400",
-    bgColor: "bg-green-500/10",
-    borderColor: "border-green-500/20",
-    badge: "自由模式",
-    badgeColor: "bg-green-500/20 text-green-400",
-  },
-];
+function minutesToHoursText(minutes: number) {
+  if (!Number.isFinite(minutes)) return "0h";
+  const h = minutes / 60;
+  if (h < 1) return `${Math.max(0, Math.round(minutes))}m`;
+  return `${h.toFixed(1)}h`;
+}
 
 const recentStudy = [
   { title: "栈和队列", subject: "数据结构", time: "2小时前", mastery: 75 },
@@ -68,6 +33,75 @@ const recentStudy = [
 
 export default function StudyPage() {
   const router = useRouter();
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
+  const [todayMinutes, setTodayMinutes] = useState<number | null>(null);
+  const [studiedToday, setStudiedToday] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.allSettled([studyApi.getReviewQueue(), statsApi.overview()]).then((results) => {
+      if (cancelled) return;
+      const [reviewRes, overviewRes] = results;
+      if (reviewRes.status === "fulfilled") setReviewCount(reviewRes.value.data.length);
+      if (overviewRes.status === "fulfilled") {
+        setTodayMinutes(overviewRes.value.data.studyTimeTodayMinutes);
+        setStudiedToday(overviewRes.value.data.studiedToday);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const studyModes = useMemo(
+    () => [
+      {
+        title: "智能推荐",
+        description: "基于你的学习进度和薄弱点，AI 智能推荐今日学习内容",
+        icon: Sparkles,
+        color: "text-purple-400",
+        bgColor: "bg-purple-500/10",
+        borderColor: "border-purple-500/20",
+        badge: "推荐",
+        badgeColor: "bg-purple-500/20 text-purple-400",
+        href: "/study",
+      },
+      {
+        title: "复习队列",
+        description: "基于间隔重复算法（SM-2），自动生成今日复习队列",
+        icon: RotateCcw,
+        color: "text-orange-400",
+        bgColor: "bg-orange-500/10",
+        borderColor: "border-orange-500/20",
+        badge: reviewCount == null ? "…" : `${reviewCount} 待复习`,
+        badgeColor: "bg-orange-500/20 text-orange-400",
+        href: "/study/review",
+      },
+      {
+        title: "学习路径",
+        description: "按知识图谱拓扑排序，从基础到进阶系统化学习",
+        icon: Route,
+        color: "text-blue-400",
+        bgColor: "bg-blue-500/10",
+        borderColor: "border-blue-500/20",
+        badge: "系统学习",
+        badgeColor: "bg-blue-500/20 text-blue-400",
+        href: "/study/path",
+      },
+      {
+        title: "自由学习",
+        description: "自由选择学科和知识点，按自己的节奏学习",
+        icon: BookOpen,
+        color: "text-green-400",
+        bgColor: "bg-green-500/10",
+        borderColor: "border-green-500/20",
+        badge: "自由模式",
+        badgeColor: "bg-green-500/20 text-green-400",
+        href: "/graph",
+      },
+    ],
+    [reviewCount]
+  );
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -82,11 +116,11 @@ export default function StudyPage() {
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-2 text-gray-400">
             <Clock className="w-4 h-4" />
-            <span>今日已学 2.5h</span>
+            <span>今日已学 {minutesToHoursText(todayMinutes ?? 0)}</span>
           </div>
           <div className="flex items-center gap-2 text-gray-400">
             <Target className="w-4 h-4" />
-            <span>已学 12 个知识点</span>
+            <span>已学 {studiedToday ?? 0} 个知识点</span>
           </div>
         </div>
       </div>
@@ -96,6 +130,7 @@ export default function StudyPage() {
           <Card
             key={mode.title}
             className={`border ${mode.borderColor} hover:scale-[1.01] transition-all duration-300 cursor-pointer group`}
+            onClick={() => router.push(mode.href)}
           >
             <CardContent className="p-6">
               <div className="flex items-start gap-4">
@@ -113,6 +148,11 @@ export default function StudyPage() {
               <Button
                 className="w-full mt-4 bg-white/5 hover:bg-white/10 border border-white/[0.08] text-gray-300"
                 variant="outline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  router.push(mode.href);
+                }}
               >
                 <Zap className="w-4 h-4 mr-2" />
                 开始学习

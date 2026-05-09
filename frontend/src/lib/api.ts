@@ -79,6 +79,10 @@ export const knowledgeApi = {
     api.get<unknown, ApiResponse<KnowledgeNode[]>>("/knowledge/nodes", { params }),
   getNode: (id: number) =>
     api.get<unknown, ApiResponse<KnowledgeNode>>(`/knowledge/nodes/${id}`),
+  createNode: (data: { title: string; content: string; difficulty?: number; topicId: number; metadata?: Record<string, unknown> }) =>
+    api.post<unknown, ApiResponse<KnowledgeNode>>("/knowledge/nodes", data),
+  createEdge: (data: { sourceId: number; targetId: number; relationType: string; weight?: number; description?: string }) =>
+    api.post<unknown, ApiResponse<KnowledgeEdge>>("/knowledge/edges", data),
   getEdges: (params?: { subjectId?: number }) =>
     api.get<unknown, ApiResponse<KnowledgeEdge[]>>("/knowledge/edges", { params }),
   getGraphData: (params?: { subjectId?: number; topicId?: number }) =>
@@ -105,10 +109,10 @@ export const studyApi = {
 
 // ─── Quiz ────────────────────────────────────────────────────────────────────
 export const quizApi = {
-  generate: (params: { subjectId?: number; topicId?: number; count?: number }) =>
-    api.get<unknown, ApiResponse<QuizQuestion[]>>("/quiz/generate", { params }),
-  submit: (data: QuizSubmission) =>
-    api.post<unknown, ApiResponse<{ score: number; total: number; wrongAnswers: WrongAnswer[] }>>(
+  generate: (nodeIds: number[], count: number = 10) =>
+    api.post<unknown, ApiResponse<QuizQuestion[]>>("/quiz/generate", null, { params: { nodeIds, count } }),
+  submit: (data: { questionId: number; userAnswer: string }) =>
+    api.post<unknown, ApiResponse<{ correct: boolean; correctAnswer: string; explanation?: string }>>(
       "/quiz/submit",
       data
     ),
@@ -146,6 +150,14 @@ export const notesApi = {
 export const statsApi = {
   overview: () =>
     api.get<unknown, ApiResponse<StatsOverview>>("/stats/overview"),
+  daily: () =>
+    api.get<unknown, ApiResponse<Array<{ date: string; sessions: number; studiedNodes: number; reviewedNodes: number; studyMinutes: number }>>>(
+      "/stats/daily"
+    ),
+  weakness: () =>
+    api.get<unknown, ApiResponse<{ topWrongNodes: Array<{ nodeId: number; wrongCount: number; nodeTitle?: string; topicName?: string }>; lowMasteryNodes: Array<{ nodeId: number; masteryLevel: number; nodeTitle?: string }> }>>(
+      "/stats/weakness"
+    ),
 };
 
 export default api;

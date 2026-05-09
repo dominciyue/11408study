@@ -1,6 +1,7 @@
 package com.study11408.controller;
 
 import com.study11408.dto.ApiResponse;
+import com.study11408.dto.StatsOverviewDTO;
 import com.study11408.security.JwtTokenProvider;
 import com.study11408.service.StatsService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -25,9 +26,9 @@ public class StatsController {
 
     @Operation(summary = "学习概览统计")
     @GetMapping("/overview")
-    public ApiResponse<Map<String, Object>> getOverview(HttpServletRequest request) {
+    public ApiResponse<StatsOverviewDTO> getOverview(HttpServletRequest request) {
         Long userId = getUserId(request);
-        return ApiResponse.ok(statsService.getOverview(userId));
+        return ApiResponse.ok(statsService.getOverviewV2(userId));
     }
 
     @Operation(summary = "每日学习统计")

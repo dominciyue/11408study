@@ -23,6 +23,9 @@ public interface KnowledgeNodeRepository extends JpaRepository<KnowledgeNode, Lo
     @Query("SELECT n FROM KnowledgeNode n WHERE n.topic.subject.id = :subjectId")
     List<KnowledgeNode> findByTopicSubjectId(@Param("subjectId") Long subjectId);
 
+    @Query("SELECT COUNT(n) FROM KnowledgeNode n WHERE n.topic.subject.id = :subjectId")
+    long countByTopicSubjectId(@Param("subjectId") Long subjectId);
+
     @Query("SELECT n FROM KnowledgeNode n WHERE " +
            "(:topicId IS NULL OR n.topic.id = :topicId) AND " +
            "(:subjectId IS NULL OR n.topic.subject.id = :subjectId) AND " +

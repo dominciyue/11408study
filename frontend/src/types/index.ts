@@ -75,6 +75,10 @@ export interface KnowledgeNode {
   mastery?: number;
   lastReviewedAt?: string;
   nextReviewAt?: string;
+
+  // backend DTO compatibility
+  topicName?: string;
+  subjectName?: string;
 }
 
 export interface KnowledgeEdge {
@@ -94,11 +98,13 @@ export interface GraphData {
 // ─── Material ────────────────────────────────────────────────────────────────
 export interface Material {
   id: number;
-  subjectId: number;
   title: string;
-  type: "pdf" | "video" | "audio" | "document" | "image";
-  url: string;
-  size: number;
+  type: string;
+  fileUrl: string;
+  originalName?: string;
+  fileSize?: number;
+  nodeId?: number;
+  uploaderId?: number;
   description?: string;
   tags: string[];
   createdAt: string;
@@ -106,20 +112,19 @@ export interface Material {
 
 // ─── Study ───────────────────────────────────────────────────────────────────
 export interface StudyProgress {
+  id: number;
+  userId: number;
   nodeId: number;
-  mastery: number;
-  reviewCount: number;
-  correctCount: number;
-  lastReviewedAt: string;
-  nextReviewAt: string;
+  masteryLevel: number;
+  lastReview?: string;
+  nextReview?: string;
+  repetitionCount: number;
   easeFactor: number;
-  interval: number;
 }
 
 export interface StudyFeedback {
   nodeId: number;
-  quality: number; // 0-5 SM-2 rating
-  timeSpent: number;
+  rating: number; // 0-5 SM-2 rating
 }
 
 export interface StudySession {
@@ -127,21 +132,21 @@ export interface StudySession {
   userId: number;
   subjectId?: number;
   mode: string;
-  startedAt: string;
-  endedAt?: string;
-  nodesStudied: number;
-  duration: number;
+  startTime: string;
+  endTime?: string;
+  studiedNodes: number;
+  reviewedNodes: number;
 }
 
 // ─── Quiz ────────────────────────────────────────────────────────────────────
 export interface QuizQuestion {
   id: number;
   nodeId: number;
-  type: "single_choice" | "multiple_choice" | "true_false" | "fill_blank" | "short_answer";
-  question: string;
-  options?: string[];
-  difficulty: number;
+  questionType: string;
+  content: string;
+  options?: string; // json string
   explanation?: string;
+  answer?: string;
 }
 
 export interface QuizSubmission {
@@ -152,34 +157,51 @@ export interface QuizSubmission {
 export interface WrongAnswer {
   id: number;
   questionId: number;
-  question: QuizQuestion;
+  nodeId?: number;
+  questionText?: string;
   userAnswer: string;
-  correctAnswer: string;
-  createdAt: string;
-  reviewed: boolean;
+  correctAnswer?: string;
+  explanation?: string;
+  answeredAt: string;
+  resolved: boolean;
 }
 
 // ─── Note ────────────────────────────────────────────────────────────────────
 export interface Note {
   id: number;
   nodeId: number;
-  userId: number;
   title: string;
   content: string;
   createdAt: string;
   updatedAt: string;
+
+  nodeTitle?: string;
+  subjectName?: string;
+  topicName?: string;
 }
 
 // ─── Stats ───────────────────────────────────────────────────────────────────
 export interface StatsOverview {
   totalNodes: number;
+  studiedNodes: number;
   masteredNodes: number;
+  averageMastery: number;
+  totalStudyMinutes: number;
   studiedToday: number;
   reviewedToday: number;
-  studyTimeToday: number;
-  streak: number;
-  weeklyStudyTime: number[];
-  subjectProgress: { subjectId: number; name: string; progress: number; color: string }[];
+  studyTimeTodayMinutes: number;
+  streakDays: number;
+  weeklyStudyTimeMinutes: number[];
+  subjectProgress: {
+    subjectId: number;
+    name: string;
+    code: string;
+    color: string;
+    progress: number;
+    totalNodes: number;
+    studiedNodes: number;
+    masteredNodes: number;
+  }[];
 }
 
 // ─── Graph View ──────────────────────────────────────────────────────────────

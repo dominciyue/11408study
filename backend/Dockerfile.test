@@ -1,0 +1,13 @@
+FROM eclipse-temurin:17-jdk-jammy
+
+RUN apt-get update && apt-get install -y --no-install-recommends maven && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY pom.xml ./
+COPY src ./src
+
+ENV MAVEN_OPTS="-Dmaven.repo.local=/app/.m2/repository"
+RUN mvn -q -DskipTests package
+
+CMD ["mvn", "-q", "test"]
+

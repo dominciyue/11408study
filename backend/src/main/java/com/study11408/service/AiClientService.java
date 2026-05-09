@@ -23,13 +23,15 @@ public class AiClientService {
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, Object> extractKnowledge(String content) {
+    public Map<String, Object> extractKnowledge(String text, String subject, String topic) {
         try {
             Map<String, Object> request = new HashMap<>();
-            request.put("content", content);
+            request.put("text", text);
+            request.put("subject", subject);
+            request.put("topic", topic);
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
-                    aiServiceUrl + "/extract-knowledge", request, Map.class);
+                    aiServiceUrl + "/ai/extract", request, Map.class);
             return response.getBody();
         } catch (RestClientException e) {
             log.error("AI知识提取服务调用失败", e);
@@ -40,8 +42,10 @@ public class AiClientService {
     @SuppressWarnings("unchecked")
     public Map<String, Object> suggestRelations(Long nodeId) {
         try {
-            ResponseEntity<Map> response = restTemplate.getForEntity(
-                    aiServiceUrl + "/suggest-relations?nodeId=" + nodeId, Map.class);
+            Map<String, Object> request = new HashMap<>();
+            request.put("node_id", nodeId);
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    aiServiceUrl + "/ai/suggest-relations", request, Map.class);
             return response.getBody();
         } catch (RestClientException e) {
             log.error("AI关系推荐服务调用失败", e);
@@ -53,12 +57,12 @@ public class AiClientService {
     public Map<String, Object> generateQuiz(Long nodeId, String questionType, int count) {
         try {
             Map<String, Object> request = new HashMap<>();
-            request.put("nodeId", nodeId);
-            request.put("questionType", questionType);
+            request.put("node_id", nodeId);
+            request.put("question_type", questionType);
             request.put("count", count);
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
-                    aiServiceUrl + "/generate-quiz", request, Map.class);
+                    aiServiceUrl + "/ai/generate-quiz", request, Map.class);
             return response.getBody();
         } catch (RestClientException e) {
             log.error("AI出题服务调用失败", e);
@@ -73,10 +77,24 @@ public class AiClientService {
             request.put("content", content);
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
-                    aiServiceUrl + "/enhance-content", request, Map.class);
+                    aiServiceUrl + "/ai/enhance", request, Map.class);
             return response.getBody();
         } catch (RestClientException e) {
             log.error("AI内容增强服务调用失败", e);
+            return Map.of("error", "AI服务暂不可用");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> parsePdf(String fileUrl) {
+        try {
+            Map<String, Object> request = new HashMap<>();
+            request.put("file_url", fileUrl);
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    aiServiceUrl + "/ai/parse-pdf", request, Map.class);
+            return response.getBody();
+        } catch (RestClientException e) {
+            log.error("AI PDF解析服务调用失败", e);
             return Map.of("error", "AI服务暂不可用");
         }
     }
