@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "知识图谱", description = "知识节点和关系的管理")
 @RestController
@@ -99,5 +100,13 @@ public class KnowledgeController {
             @RequestParam(defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ApiResponse.ok(knowledgeGraphService.searchNodes(q, pageable));
+    }
+
+    @Operation(summary = "AI 深入解读节点（详解/口诀/类比）")
+    @PostMapping("/nodes/{id}/ai-enhance")
+    public ApiResponse<Map<String, Object>> aiEnhanceNode(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "EXPLAIN") String type) {
+        return ApiResponse.ok(knowledgeGraphService.aiEnhanceNode(id, type));
     }
 }

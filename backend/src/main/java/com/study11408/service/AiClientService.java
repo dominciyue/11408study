@@ -85,10 +85,12 @@ public class AiClientService {
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, Object> enhanceContent(String content) {
+    public Map<String, Object> enhanceContent(String title, String content, String enhanceType) {
         try {
             Map<String, Object> request = new HashMap<>();
+            request.put("title", title);
             request.put("content", content);
+            request.put("enhance_type", enhanceType);
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
                     aiServiceUrl + "/ai/enhance", request, Map.class);

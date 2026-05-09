@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import {
   X,
   BookOpen,
@@ -9,11 +9,13 @@ import {
   Tag,
   BarChart3,
   ExternalLink,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import AiEnhanceDialog from "@/components/graph/ai-enhance-dialog";
 
 interface NodeDetailPanelProps {
   node: {
@@ -48,9 +50,13 @@ const difficultyLabels: Record<string, { label: string; color: string }> = {
 };
 
 export function NodeDetailPanel({ node, relatedNodes, onClose, onNodeClick }: NodeDetailPanelProps) {
+  const [aiOpen, setAiOpen] = useState(false);
+
   if (!node) return null;
 
   const diffInfo = difficultyLabels[node.difficulty || "MEDIUM"] || difficultyLabels.MEDIUM;
+  const numericNodeId = Number(node.id);
+  const aiEnabled = Number.isFinite(numericNodeId) && numericNodeId > 0;
 
   return (
     <div className="w-[380px] h-full bg-[#0f0f17] border-l border-white/[0.06] flex flex-col shrink-0">
@@ -150,9 +156,28 @@ export function NodeDetailPanel({ node, relatedNodes, onClose, onNodeClick }: No
               <BookOpen className="w-4 h-4 mr-2" />
               开始学习
             </Button>
+            <Button
+              variant="outline"
+              className="border-purple-500/30 text-purple-300 hover:bg-purple-500/10 text-sm"
+              onClick={() => setAiOpen(true)}
+              disabled={!aiEnabled}
+              title={aiEnabled ? "AI 详解 / 口诀 / 类比" : "节点 ID 无效"}
+            >
+              <Sparkles className="w-4 h-4 mr-1.5" />
+              AI 解读
+            </Button>
           </div>
         </div>
       </ScrollArea>
+
+      {aiEnabled ? (
+        <AiEnhanceDialog
+          open={aiOpen}
+          onOpenChange={setAiOpen}
+          nodeId={numericNodeId}
+          nodeTitle={node.title}
+        />
+      ) : null}
     </div>
   );
 }

@@ -18,6 +18,8 @@ import { Progress } from "@/components/ui/progress";
 import { useAuthStore } from "@/stores/auth-store";
 import { statsApi } from "@/lib/api";
 import type { StatsOverview } from "@/types";
+import { BadgesCard } from "@/components/dashboard/badges-card";
+import { DailyTasksCard } from "@/components/dashboard/daily-tasks-card";
 import {
   ResponsiveContainer,
   BarChart,
@@ -109,6 +111,12 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Daily tasks + Badges (Feature 2 — 游戏化) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <DailyTasksCard tasks={overview?.dailyTasks} />
+        <BadgesCard badges={overview?.badges} />
       </div>
 
       {/* Subject progress cards */}

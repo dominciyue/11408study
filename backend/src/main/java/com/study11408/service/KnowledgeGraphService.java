@@ -22,9 +22,13 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class KnowledgeGraphService {
 
+    private static final java.util.Set<String> ALLOWED_ENHANCE_TYPES =
+            java.util.Set.of("EXPLAIN", "MNEMONIC", "ANALOGY");
+
     private final KnowledgeNodeRepository nodeRepository;
     private final KnowledgeEdgeRepository edgeRepository;
     private final TopicRepository topicRepository;
+    private final AiClientService aiClientService;
 
     public Page<KnowledgeNodeDTO> getNodes(Long topicId, Long subjectId, String keyword, Pageable pageable) {
         return nodeRepository.findFiltered(topicId, subjectId, keyword, pageable)
@@ -35,6 +39,23 @@ public class KnowledgeGraphService {
         KnowledgeNode node = nodeRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("知识节点不存在", HttpStatus.NOT_FOUND));
         return toNodeDTO(node);
+    }
+
+    /**
+     * 调用 AI 对节点做深入解读。enhance_type ∈ {EXPLAIN, MNEMONIC, ANALOGY}。
+     * 返回 ai-service 原始 map（含 enhanced_content + enhance_type，或 error）。
+     */
+    public Map<String, Object> aiEnhanceNode(Long nodeId, String enhanceType) {
+        String upperType = enhanceType == null ? "EXPLAIN" : enhanceType.toUpperCase();
+        if (!ALLOWED_ENHANCE_TYPES.contains(upperType)) {
+            throw new BusinessException(
+                    "enhanceType 必须是 EXPLAIN / MNEMONIC / ANALOGY",
+                    HttpStatus.BAD_REQUEST);
+        }
+        KnowledgeNode node = nodeRepository.findById(nodeId)
+                .orElseThrow(() -> new BusinessException("知识节点不存在", HttpStatus.NOT_FOUND));
+        String content = node.getContent() != null ? node.getContent() : "";
+        return aiClientService.enhanceContent(node.getTitle(), content, upperType);
     }
 
     @Transactional

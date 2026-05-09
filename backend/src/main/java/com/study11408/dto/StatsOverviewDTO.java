@@ -25,5 +25,9 @@ public class StatsOverviewDTO {
 
     private List<Long> weeklyStudyTimeMinutes; // last 7 days, oldest -> newest
     private List<SubjectProgressDTO> subjectProgress;
+
+    // Feature 2 — 游戏化卡片（基于既有数据派生，无新表）
+    private List<BadgeDTO> badges;
+    private List<DailyTaskDTO> dailyTasks;
 }
 

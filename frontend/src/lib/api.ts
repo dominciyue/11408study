@@ -74,7 +74,15 @@ export const topicsApi = {
 };
 
 // ─── Knowledge Nodes & Edges ─────────────────────────────────────────────────
+export type AiEnhanceType = "EXPLAIN" | "MNEMONIC" | "ANALOGY";
+
 export const knowledgeApi = {
+  aiEnhance: (nodeId: number, type: AiEnhanceType = "EXPLAIN") =>
+    api.post<unknown, ApiResponse<{ enhanced_content?: string; enhance_type?: string; error?: string }>>(
+      `/knowledge/nodes/${nodeId}/ai-enhance`,
+      null,
+      { params: { type }, timeout: 90000 } // LLM 详解通常 5-30s
+    ),
   getNodes: (params?: { subjectId?: number; topicId?: number; difficulty?: number }) =>
     api.get<unknown, ApiResponse<KnowledgeNode[]>>("/knowledge/nodes", { params }),
   getNode: (id: number) =>

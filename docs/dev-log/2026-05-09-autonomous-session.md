@@ -271,3 +271,89 @@ WeakKey 修了之后跑 IT，又发现：
 | 多轮 history 在客户端易篡改 | 可能注入 prompt | 仅作 UX 提示，权威 prompt 由服务端构造 |
 | DeepSeek 限速 | 失败 | 已有 `_is_retryable` 区分 4xx 不重试，5xx 重试 3 次 |
 
+---
+
+## 第三批：续会话（2026-05-09 16:45–？）
+
+### 目标
+基于上一批末尾的"下一会话候选"清单，落地 2 个新功能：
+1. **AI 节点深入解读**（候选#1）— 复用现有 ai-service `/ai/enhance`，在 graph 节点详情面板加按钮，弹 Dialog 展示 详解/口诀/类比
+2. **徽章 + 每日任务**（候选#4）— 基于既有 streakDays/studiedToday 等数据派生 9 枚徽章 + 3 个每日任务，dashboard 卡片展示
+
+### Phase A — Feature 1: AI 节点深入解读
+
+**backend：**
+- 修复 `AiClientService.enhanceContent` 签名：`String content` → `(String title, String content, String enhanceType)`（之前少传 title/enhance_type，调用 ai-service 必失败 — 实际无 caller，是死代码）
+- `KnowledgeGraphService.aiEnhanceNode(nodeId, type)`：white-list 检查 EXPLAIN/MNEMONIC/ANALOGY，404 / 400 分支齐全
+- `POST /knowledge/nodes/{id}/ai-enhance?type=EXPLAIN`（通过 Spring Security `.anyRequest().authenticated()` 强制 auth）
+- 6 个 Mockito 单测覆盖：bad type / 节点不存在 / 大小写规整 / 缺省 EXPLAIN / null content / 三种 type 全过
+
+**frontend：**
+- `knowledgeApi.aiEnhance(nodeId, type)`（90s timeout）
+- `AiEnhanceDialog`：3 tab 切换（详解/口诀/类比）+ 客户端缓存避免重复 LLM 调用
+- `node-detail-panel.tsx` 在 "开始学习" 按钮旁加 `AI 解读` 紫色按钮
+
+**E2E 真实 DeepSeek 调用：**
+- type=MNEMONIC → 10s → 返回结构化 4 段（口诀/联想记忆法/关键词串联法/公式记忆技巧）
+- 校验路径：bad type 400 ✅ / 不存在节点 404 ✅ / 无 auth 401 ✅
+
+### Phase B — Feature 2: 徽章 + 每日任务
+
+零新表，纯数据派生：
+
+**徽章（9 枚）：**
+- 🔥 破冰：streak ≥ 1
+- 🔥🔥 坚持一周：streak ≥ 7
+- 🔥🔥🔥 钢铁意志：streak ≥ 30
+- 📚 入门学习者：累计学习节点 ≥ 10
+- 📖 知识探索者：累计学习节点 ≥ 50
+- 🎯 考研学霸：累计学习节点 ≥ 100
+- ⏰ 今日专注：今日学习满 60 分钟
+- 🧠 复习达人：今日复习 ≥ 10 个
+- 💯 精通：平均掌握度 ≥ 80%
+
+**每日任务（3 件套）：**
+- 学习 5 个新节点
+- 复习 10 个节点
+- 专注学习 30 分钟
+
+**实现：**
+- 新增 DTO：`BadgeDTO` + `DailyTaskDTO`，挂在 `StatsOverviewDTO.badges/dailyTasks`（保持单端点单往返）
+- `StatsService.computeBadges/computeDailyTasks` 静态纯函数
+- 8 个单测：阈值边界（=与<）/ avgMastery 四舍五入 / 负数 clamp / 全部解锁 / 全部未解锁
+- `BadgesCard` + `DailyTasksCard` React 组件，dashboard 第二行展示
+
+**E2E：**
+- `/api/stats/overview` 返回新字段：9 badges + 3 dailyTasks（新用户全为 0/未解锁，符合预期）
+
+### 测试覆盖（截至本节）
+
+| 套件 | 数量 | 状态 |
+|---|---|---|
+| Backend Unit | **43** (+14) | ✅ ALL PASS |
+| Backend IT | 9 | ✅ ALL PASS |
+| AI Service pytest | 20 | ✅ ALL PASS |
+| **Total** | **72** (+14) | **100% green** |
+
+### Commit 清单（本批）
+
+| # | commit | 说明 |
+|---|---|---|
+| 1 | (待) | feat: AI 节点深入解读 + 徽章/每日任务 dashboard |
+
+### 关键决策
+
+- **修复 enhanceContent 死代码** 顺手做了（仅 1 处 callsite，全是新代码）
+- **Feature 2 走 overview 单端点**（vs 单独 /badges + /daily-tasks）— 减少前端往返，DTO 字段为可选不破坏旧 client
+- **静态纯函数**（computeBadges/computeDailyTasks）— 无 DB 依赖，无 mock 开销，单测最快
+- **frontend 客户端缓存 AI 输出**（每 type 一份）— 切换 tab 不重新 LLM 调用，节省成本
+
+### 风险与缓解
+
+| 风险 | 缓解 |
+|---|---|
+| 新 DTO 字段可能破坏旧 client | 用可选字段 `badges?` / `dailyTasks?`，旧前端忽略不会出错 |
+| Feature 2 三件套阈值难调（5/10/30 太松或太严） | 后续可移到配置化，v1 先固定 |
+| 徽章 perfectionist 用 avgMastery 四舍五入边界（79.5→80） | 单测显式锁住行为 |
+
+

@@ -1,5 +1,7 @@
 package com.study11408.service;
 
+import com.study11408.dto.BadgeDTO;
+import com.study11408.dto.DailyTaskDTO;
 import com.study11408.dto.StatsOverviewDTO;
 import com.study11408.dto.SubjectProgressDTO;
 import com.study11408.entity.StudyProgress;
@@ -144,6 +146,11 @@ public class StatsService {
                     .build();
         }).collect(Collectors.toList());
 
+        List<BadgeDTO> badges = computeBadges(
+                streakDays, studiedNodes, studyTimeTodayMinutes, reviewedToday, avgMastery);
+        List<DailyTaskDTO> dailyTasks = computeDailyTasks(
+                studiedToday, reviewedToday, studyTimeTodayMinutes);
+
         return StatsOverviewDTO.builder()
                 .totalNodes(totalNodes)
                 .studiedNodes(studiedNodes)
@@ -156,6 +163,68 @@ public class StatsService {
                 .streakDays(streakDays)
                 .weeklyStudyTimeMinutes(weeklyStudyTimeMinutes)
                 .subjectProgress(subjectProgress)
+                .badges(badges)
+                .dailyTasks(dailyTasks)
+                .build();
+    }
+
+    /**
+     * 基于既有数据派生 9 枚徽章（无新表）。
+     * 每枚都返回 earned + current/target，前端可据此渲染解锁/未解锁两态。
+     */
+    public static List<BadgeDTO> computeBadges(
+            int streakDays,
+            long studiedNodes,
+            long studyTimeTodayMinutes,
+            long reviewedToday,
+            double avgMastery) {
+        List<BadgeDTO> badges = new ArrayList<>();
+        badges.add(badge("firstStep", "破冰", "连续学习 1 天", "🔥", streakDays, 1));
+        badges.add(badge("weekHero", "坚持一周", "连续学习 7 天", "🔥🔥", streakDays, 7));
+        badges.add(badge("monthIron", "钢铁意志", "连续学习 30 天", "🔥🔥🔥", streakDays, 30));
+        badges.add(badge("starter", "入门学习者", "累计学习 10 个节点", "📚", studiedNodes, 10));
+        badges.add(badge("explorer", "知识探索者", "累计学习 50 个节点", "📖", studiedNodes, 50));
+        badges.add(badge("master", "考研学霸", "累计学习 100 个节点", "🎯", studiedNodes, 100));
+        badges.add(badge("focused", "今日专注", "今日学习满 60 分钟", "⏰", studyTimeTodayMinutes, 60));
+        badges.add(badge("reviewer", "复习达人", "今日复习 ≥ 10 个", "🧠", reviewedToday, 10));
+        badges.add(badge("perfectionist", "精通", "平均掌握度 ≥ 80%", "💯", Math.round(avgMastery), 80));
+        return badges;
+    }
+
+    private static BadgeDTO badge(
+            String code, String name, String description, String icon,
+            long current, long target) {
+        long clamped = Math.max(current, 0);
+        return BadgeDTO.builder()
+                .code(code)
+                .name(name)
+                .description(description)
+                .icon(icon)
+                .earned(clamped >= target)
+                .current(clamped)
+                .target(target)
+                .build();
+    }
+
+    /**
+     * 今日三件套：5 新 / 10 复习 / 30 分钟。规则简单可派生。
+     */
+    public static List<DailyTaskDTO> computeDailyTasks(
+            long studiedToday, long reviewedToday, long studyTimeTodayMinutes) {
+        return List.of(
+                dailyTask("learn5new", "学习 5 个新节点", studiedToday, 5),
+                dailyTask("review10", "复习 10 个节点", reviewedToday, 10),
+                dailyTask("focus30min", "专注学习 30 分钟", studyTimeTodayMinutes, 30));
+    }
+
+    private static DailyTaskDTO dailyTask(String code, String name, long current, long target) {
+        long clamped = Math.max(current, 0);
+        return DailyTaskDTO.builder()
+                .code(code)
+                .name(name)
+                .current(clamped)
+                .target(target)
+                .completed(clamped >= target)
                 .build();
     }
 

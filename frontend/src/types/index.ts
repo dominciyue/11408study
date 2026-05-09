@@ -181,6 +181,24 @@ export interface Note {
 }
 
 // ─── Stats ───────────────────────────────────────────────────────────────────
+export interface Badge {
+  code: string;
+  name: string;
+  description: string;
+  icon: string;
+  earned: boolean;
+  current: number;
+  target: number;
+}
+
+export interface DailyTask {
+  code: string;
+  name: string;
+  current: number;
+  target: number;
+  completed: boolean;
+}
+
 export interface StatsOverview {
   totalNodes: number;
   studiedNodes: number;
@@ -202,6 +220,8 @@ export interface StatsOverview {
     studiedNodes: number;
     masteredNodes: number;
   }[];
+  badges?: Badge[];
+  dailyTasks?: DailyTask[];
 }
 
 // ─── Graph View ──────────────────────────────────────────────────────────────
