@@ -50,4 +50,13 @@ public class StudyProgress {
     @Builder.Default
     @Column(name = "ease_factor", nullable = false)
     private Double easeFactor = 2.5;
+
+    @Builder.Default
+    @Column(name = "interval_days")
+    private Integer intervalDays = 0;
+
+    @Version
+    @Builder.Default
+    @Column(nullable = false)
+    private Long version = 0L;
 }
