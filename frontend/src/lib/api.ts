@@ -113,6 +113,12 @@ export const studyApi = {
     api.post<unknown, ApiResponse<StudySession>>("/study/sessions", data),
   endSession: (sessionId: number) =>
     api.put<unknown, ApiResponse<StudySession>>(`/study/sessions/${sessionId}/end`),
+  aiPlan: (body: { subjectId?: number; weeks: number; goal: string }) =>
+    api.post<unknown, ApiResponse<{ plan?: unknown[]; summary?: string; error?: string }>>(
+      "/study/ai-plan",
+      body,
+      { timeout: 120000 } // LLM 周计划生成可能 20-60s
+    ),
 };
 
 // ─── Quiz ────────────────────────────────────────────────────────────────────

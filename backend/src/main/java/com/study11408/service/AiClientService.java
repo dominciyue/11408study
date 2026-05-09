@@ -127,6 +127,51 @@ public class AiClientService {
         }
     }
 
+    /**
+     * 调用 ai-service `/ai/study-plan` 生成分周学习计划。
+     *
+     * @param goal 用户目标（必填）
+     * @param weeks 计划跨度（已由 controller 层 @Valid 校验在 [1,52]）
+     * @param subjectName 主攻学科名（可空）
+     * @param weakTopics 薄弱主题列表（可空）
+     * @param studiedNodes 已学知识点数（可空）
+     * @param totalNodes 知识点总数（可空）
+     * @return ai-service 原始响应（plan + summary），或 {error: ...} 表示降级
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> generateStudyPlan(
+            String goal,
+            int weeks,
+            String subjectName,
+            List<String> weakTopics,
+            Long studiedNodes,
+            Long totalNodes) {
+        try {
+            Map<String, Object> request = new HashMap<>();
+            request.put("goal", goal);
+            request.put("weeks", weeks);
+            if (subjectName != null && !subjectName.isBlank()) {
+                request.put("subject_name", subjectName);
+            }
+            if (weakTopics != null && !weakTopics.isEmpty()) {
+                request.put("weak_topics", weakTopics);
+            }
+            if (studiedNodes != null) {
+                request.put("studied_nodes", studiedNodes);
+            }
+            if (totalNodes != null) {
+                request.put("total_nodes", totalNodes);
+            }
+
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    aiServiceUrl + "/ai/study-plan", request, Map.class);
+            return response.getBody();
+        } catch (RestClientException e) {
+            log.error("AI 学习计划生成服务调用失败", e);
+            return Map.of("error", "AI服务暂不可用");
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public Map<String, Object> parsePdf(String fileUrl) {
         try {

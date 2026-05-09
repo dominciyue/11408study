@@ -56,15 +56,15 @@ export default function StudyPage() {
   const studyModes = useMemo(
     () => [
       {
-        title: "智能推荐",
-        description: "基于你的学习进度和薄弱点，AI 智能推荐今日学习内容",
+        title: "AI 学习计划",
+        description: "DeepSeek 根据你的学科、目标和薄弱点，生成个性化周计划",
         icon: Sparkles,
         color: "text-purple-400",
         bgColor: "bg-purple-500/10",
         borderColor: "border-purple-500/20",
-        badge: "推荐",
+        badge: "DeepSeek",
         badgeColor: "bg-purple-500/20 text-purple-400",
-        href: "/study",
+        href: "/study/plan",
       },
       {
         title: "复习队列",

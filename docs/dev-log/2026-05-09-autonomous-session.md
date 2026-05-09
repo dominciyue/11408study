@@ -428,5 +428,67 @@ WeakKey 修了之后跑 IT，又发现：
 | Pomodoro 浏览器通知权限被拒 | 静默降级（仅 visual flash），无错误 |
 | Pomodoro state 切页面丢失 | 文档化为 v1 限制，v2 加 zustand persist |
 
+---
+
+## 第五批：续会话（2026-05-09 17:30–？）
+
+### 目标
+继续 Top 5 候选 + 上批留下的 polish：
+1. **Feature 5 AI 学习计划生成**（之前候选 #4）— DeepSeek 输出个性化周计划
+2. **Feature 6 React Flow 节点 mini stars** — 让 Feature 3 的能力等级在图谱视图也可见
+
+### Phase A — Feature 6（前端 polish，inline）
+
+`knowledge-node.tsx` 把原来的 1px 进度条改成 5 颗 lucide `Star`（w-2.5 h-2.5），filled 黄色 / empty 灰色，分桶规则与详情面板一致。`mastery` 数据已通过 `nodeData.mastery` 传入，无需后端改动。
+
+### Phase B — Feature 5（subagent 并行 backend + 主对话前端）
+
+**subagent 任务（ai-service + backend Java）：**
+- ai-service: `POST /ai/study-plan` 接收 goal/weeks/subject_name/weak_topics/studied_nodes/total_nodes，返回 `WeekPlan[]` + summary
+  - 新文件：`models/study_plan.py` + `services/study_plan_service.py` + `routers/study_plan.py`
+  - 修改：`dependencies.py` + `main.py`
+  - 5+ pytest（validation / mock LLM / 错误路径）
+- backend: `POST /study/ai-plan` 接收 subjectId/weeks/goal，自动注入用户 weak_topics + studied/total，转发到 ai-service
+  - 新 DTO `StudyPlanRequest`
+  - `AiClientService.generateStudyPlan(...)`
+  - `StudyPathService.generateAiPlan(...)`
+  - `StudyController` 加端点
+  - 5+ Mockito 单测
+
+**主对话任务（前端，inline）：**
+- 新页 `/study/plan/page.tsx`：
+  - 表单：学科 select（可选）+ 周数 input（1-52）+ 目标 textarea
+  - 提交 → 120s timeout LLM 调用 → loading
+  - 周计划展示：每周一卡片（标题 + 本周目标 + 每日任务 + 重点复习）
+  - localStorage 持久化（v1，下次打开恢复上一份）
+- `studyApi.aiPlan` helper（120s timeout 给足 LLM）
+- types: `WeekPlan` + `StudyPlanResponse`
+- 修改 `/study/page.tsx`："智能推荐"卡片改名"AI 学习计划"，链接到 `/study/plan`
+
+### 测试覆盖（截至本节）
+
+待 subagent 完成后填充。预期：backend +5 unit + ai-service +5 pytest = +10。
+
+### Commit 清单（本批）
+
+| # | commit | 说明 |
+|---|---|---|
+| 1 | (待) | feat: AI 学习计划生成 + 图谱节点 mini stars |
+
+### 关键决策
+
+- **AI 学习计划用 localStorage v1**（不入库）— 避免新表，简化迭代；用户每次生成会覆盖上一份
+- **Feature 5 用 subagent 拆分** — backend 后端工作量较大，subagent 专注一个清晰契约
+- **Feature 6 完全前端**（mastery 已在 nodeData 中）— 无需 backend 改动
+- **/study 页 "智能推荐" 卡片改名 "AI 学习计划"** — 明确入口，避免之前那个空链接到自身的循环
+
+### 风险与缓解
+
+| 风险 | 缓解 |
+|---|---|
+| LLM 周计划长输出可能格式跑偏 | service 用 `_parse_json_response` 兼容 markdown 包裹；非 JSON 返 ValueError → 400 |
+| 12+ 周计划 token 数大、可能超时 | 客户端 timeout 120s；服务端 LLM 已有重试策略 |
+| 用户切设备丢计划 | 文档化 v1：localStorage 只本机；v2 可入库 |
+
 
 

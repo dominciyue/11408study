@@ -4,6 +4,7 @@ import com.study11408.dto.ApiResponse;
 import com.study11408.dto.KnowledgeNodeDTO;
 import com.study11408.dto.StartStudySessionRequest;
 import com.study11408.dto.StudyFeedbackRequest;
+import com.study11408.dto.StudyPlanRequest;
 import com.study11408.entity.StudyProgress;
 import com.study11408.entity.StudySession;
 import com.study11408.security.JwtTokenProvider;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "学习系统", description = "学习路径、复习队列、学习反馈")
 @RestController
@@ -83,6 +85,17 @@ public class StudyController {
             @PathVariable Long sessionId) {
         Long userId = getUserId(request);
         return ApiResponse.ok(studySessionService.endSession(userId, sessionId));
+    }
+
+    @Operation(summary = "AI 生成分周学习计划",
+            description = "根据用户目标 + 周数 + 薄弱主题，调用 ai-service "
+                    + "生成 N 周学习计划。返回原始 ai-service 响应（plan 数组 + summary）。")
+    @PostMapping("/ai-plan")
+    public ApiResponse<Map<String, Object>> generateAiPlan(
+            HttpServletRequest request,
+            @Valid @RequestBody StudyPlanRequest body) {
+        Long userId = getUserId(request);
+        return ApiResponse.ok(studyPathService.generateAiPlan(userId, body));
     }
 
     private Long getUserId(HttpServletRequest request) {

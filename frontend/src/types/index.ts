@@ -199,6 +199,20 @@ export interface DailyTask {
   completed: boolean;
 }
 
+export interface WeekPlan {
+  week: number;
+  title: string;
+  goals: string[];
+  daily_tasks: string[];
+  review_focus?: string[];
+}
+
+export interface StudyPlanResponse {
+  plan: WeekPlan[];
+  summary?: string;
+  error?: string;
+}
+
 export interface StatsOverview {
   totalNodes: number;
   studiedNodes: number;

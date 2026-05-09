@@ -2,7 +2,17 @@
 
 import React, { memo } from "react";
 import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Star } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function masteryToStarsLevel(m: number): number {
+  const v = Math.max(0, Math.min(100, m));
+  if (v <= 20) return 1;
+  if (v <= 40) return 2;
+  if (v <= 60) return 3;
+  if (v <= 80) return 4;
+  return 5;
+}
 
 const difficultyColors: Record<string, string> = {
   EASY: "bg-green-500",
@@ -62,13 +72,19 @@ function KnowledgeNodeComponent({ data }: NodeProps) {
       </div>
 
       {nodeData.mastery !== undefined && nodeData.mastery > 0 && (
-        <div className="mt-2">
-          <div className="w-full h-1 rounded-full bg-white/10 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-blue-500 transition-all"
-              style={{ width: `${nodeData.mastery}%` }}
-            />
-          </div>
+        <div className="mt-2 flex items-center gap-0.5" title={`掌握度 ${nodeData.mastery}%`}>
+          {[1, 2, 3, 4, 5].map((i) => {
+            const filled = i <= masteryToStarsLevel(nodeData.mastery!);
+            return (
+              <Star
+                key={i}
+                className={cn(
+                  "w-2.5 h-2.5",
+                  filled ? "text-yellow-400 fill-yellow-400" : "text-gray-600"
+                )}
+              />
+            );
+          })}
         </div>
       )}
 
