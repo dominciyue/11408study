@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.dependencies import get_llm_service
 from app.routers import (
     knowledge_extract,
     quiz_generate,
@@ -25,6 +26,24 @@ async def lifespan(app: FastAPI):
     logger.info("=== %s 启动 ===", settings.app_name)
     logger.info("LLM 提供商: %s", settings.llm_provider)
     logger.info("调试模式: %s", settings.debug)
+
+    # P0-13: 启动时校验 LLM key 配置，避免第一次调用时才发现缺失（重试 14 秒）
+    llm_service = get_llm_service()
+    try:
+        llm_service.validate_config()
+        logger.info("[OK] LLM 配置校验通过 (provider=%s)", settings.llm_provider)
+    except ValueError as e:
+        if settings.allow_missing_llm_key:
+            logger.warning(
+                "[WARN] LLM 配置校验失败但已放行 (ALLOW_MISSING_LLM_KEY=true): %s", e
+            )
+            logger.warning(
+                "[WARN] AI 调用将立即失败（不再做 14 秒重试），请配置正确的 API key 后重启"
+            )
+        else:
+            logger.error("[FAIL] LLM 配置校验失败: %s", e)
+            raise
+
     yield
     logger.info("=== %s 关闭 ===", settings.app_name)
 
