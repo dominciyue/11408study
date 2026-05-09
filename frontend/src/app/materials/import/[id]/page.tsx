@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { FileText, Wand2, ChevronLeft, Check } from "lucide-react";
 import { knowledgeApi, topicsApi } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 import type { Topic } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,9 +17,15 @@ type ExtractPoint = { title: string; content: string; difficulty?: string };
 type ExtractResp = { knowledgePoints: ExtractPoint[]; rawText?: string };
 
 async function postJson<T>(url: string, body?: unknown): Promise<T> {
+  // 必须带 Authorization header；P0-03 修复后后端会强制鉴权，无 token 直接 401
+  const token = getToken();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json();

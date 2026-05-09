@@ -4,9 +4,11 @@ import com.study11408.dto.*;
 import com.study11408.entity.Material;
 import com.study11408.exception.BusinessException;
 import com.study11408.repository.MaterialRepository;
+import com.study11408.security.JwtTokenProvider;
 import com.study11408.service.AiClientService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -23,12 +25,20 @@ public class ImportController {
 
     private final MaterialRepository materialRepository;
     private final AiClientService aiClientService;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Operation(summary = "解析资料PDF为分块")
     @PostMapping("/materials/{materialId}/parse-pdf")
-    public ApiResponse<ImportPdfParseResponse> parsePdf(@PathVariable Long materialId) {
+    public ApiResponse<ImportPdfParseResponse> parsePdf(@PathVariable Long materialId, HttpServletRequest request) {
+        Long userId = getUserId(request);
+
         Material material = materialRepository.findById(materialId)
                 .orElseThrow(() -> new BusinessException("资料不存在", HttpStatus.NOT_FOUND));
+
+        // 归属校验：仅 uploader 本人可触发解析（旧数据 uploaderId 可能为 null，向后兼容放行）
+        if (material.getUploaderId() != null && !material.getUploaderId().equals(userId)) {
+            throw new BusinessException("无权访问此资料", HttpStatus.FORBIDDEN);
+        }
 
         if (material.getFileUrl() == null || material.getFileUrl().isBlank()) {
             throw new BusinessException("资料缺少文件地址", HttpStatus.BAD_REQUEST);
@@ -63,7 +73,10 @@ public class ImportController {
 
     @Operation(summary = "对文本分块进行知识点提取")
     @PostMapping("/extract")
-    public ApiResponse<ImportKnowledgeExtractResponse> extract(@Valid @RequestBody ImportKnowledgeExtractRequest body) {
+    public ApiResponse<ImportKnowledgeExtractResponse> extract(@Valid @RequestBody ImportKnowledgeExtractRequest body, HttpServletRequest request) {
+        // extract 不绑定 materialId，仅做登录校验避免任意调用者刷 LLM 费用
+        getUserId(request);
+
         Map<String, Object> raw = aiClientService.extractKnowledge(body.getText(), body.getSubject(), body.getTopic());
         if (raw == null || raw.containsKey("error")) {
             throw new BusinessException("知识点提取失败: " + (raw == null ? "AI服务无响应" : raw.get("error")), HttpStatus.BAD_GATEWAY);
@@ -89,5 +102,20 @@ public class ImportController {
                 .rawText(rawText)
                 .build());
     }
-}
 
+    /**
+     * 从请求中提取当前登录用户 ID。
+     * 缺失或非法 token 抛 401（即便 SecurityFilter 已通过，token 中无 userId claim 也视为未登录）。
+     */
+    private Long getUserId(HttpServletRequest request) {
+        String token = jwtTokenProvider.resolveToken(request);
+        if (token == null) {
+            throw new BusinessException("未登录", HttpStatus.UNAUTHORIZED);
+        }
+        Long userId = jwtTokenProvider.getUserId(token);
+        if (userId == null) {
+            throw new BusinessException("未登录", HttpStatus.UNAUTHORIZED);
+        }
+        return userId;
+    }
+}
