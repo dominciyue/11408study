@@ -13,8 +13,9 @@ spring:
 
 app:
   jwt:
-    # deterministic for tests; base64 string
-    secret: dGVzdC1qd3Qtc2VjcmV0LWtleS0xMTQwOA==
+    # deterministic for tests; base64 string ≥ 256 bits (HS256 requires 32+ bytes raw)
+    # decodes to: "test-jwt-secret-key-for-11408-study-platform-integration-test-suite"
+    secret: dGVzdC1qd3Qtc2VjcmV0LWtleS1mb3ItMTE0MDgtc3R1ZHktcGxhdGZvcm0taW50ZWdyYXRpb24tdGVzdC1zdWl0ZQ==
     expiration: 86400000
     refresh-expiration: 604800000
   minio:
