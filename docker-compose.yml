@@ -45,6 +45,8 @@ services:
       APP_MINIO_SECRET_KEY: minioadmin123
       APP_MINIO_BUCKET: study11408
       APP_AI_SERVICE_URL: http://ai-service:8000
+    ports:
+      - "8080:8080"
     depends_on:
       - postgres
       - redis
@@ -67,6 +69,8 @@ services:
     environment:
       # When accessing via nginx on host port 18081.
       NEXT_PUBLIC_API_BASE_URL: http://localhost:18081/api
+    ports:
+      - "3000:3000"
     depends_on:
       - backend
 
