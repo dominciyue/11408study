@@ -34,6 +34,16 @@ public class QuizController {
         return ApiResponse.ok(quizService.generateQuiz(nodeIds, count));
     }
 
+    @Operation(summary = "自适应组卷（按应复习→低掌握→未学优先）")
+    @PostMapping("/adaptive-generate")
+    public ApiResponse<List<QuizQuestion>> adaptiveGenerate(
+            HttpServletRequest request,
+            @RequestParam(required = false) Long subjectId,
+            @RequestParam(defaultValue = "10") int count) {
+        Long userId = getUserId(request);
+        return ApiResponse.ok(quizService.adaptiveGenerate(userId, subjectId, count));
+    }
+
     @Operation(summary = "提交答案")
     @PostMapping("/submit")
     public ApiResponse<Map<String, Object>> submitAnswer(

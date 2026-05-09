@@ -126,6 +126,12 @@ export const quizApi = {
     ),
   getWrongAnswers: () =>
     api.get<unknown, ApiResponse<WrongAnswer[]>>("/quiz/wrong-answers"),
+  adaptiveGenerate: (subjectId?: number, count: number = 10) =>
+    api.post<unknown, ApiResponse<QuizQuestion[]>>(
+      "/quiz/adaptive-generate",
+      null,
+      { params: { subjectId, count } }
+    ),
   aiExplain: (
     questionId: number,
     body: {

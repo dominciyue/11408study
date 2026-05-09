@@ -1,5 +1,6 @@
 package com.study11408.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -23,6 +24,11 @@ public class QuizQuestion {
     @Column(name = "node_id", insertable = false, updatable = false)
     private Long nodeId;
 
+    // P1-bug fix: lazy proxy chain (node→topic→subject) breaks Jackson serialization
+    // when QuizQuestion is returned directly. Frontend uses `nodeId` (Long), so we
+    // can safely hide `node` from JSON output. Backend code (e.g. QuizService.explainWithAi)
+    // still has access via getNode() — only the wire format changes.
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "node_id", nullable = false)
     private KnowledgeNode node;

@@ -51,6 +51,8 @@ class QuizServiceAiExplainUnitTest {
     @Mock private WrongAnswerRepository wrongAnswerRepository;
     @Mock private UserRepository userRepository;
     @Mock private AiClientService aiClientService;
+    @Mock private com.study11408.repository.StudyProgressRepository progressRepository;
+    @Mock private com.study11408.repository.KnowledgeNodeRepository nodeRepository;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -60,7 +62,7 @@ class QuizServiceAiExplainUnitTest {
     void setup() {
         service = new QuizService(
                 questionRepository, wrongAnswerRepository, userRepository,
-                aiClientService, objectMapper);
+                aiClientService, objectMapper, progressRepository, nodeRepository);
     }
 
     @Test

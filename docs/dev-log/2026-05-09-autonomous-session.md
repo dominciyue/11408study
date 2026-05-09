@@ -356,4 +356,77 @@ WeakKey 修了之后跑 IT，又发现：
 | Feature 2 三件套阈值难调（5/10/30 太松或太严） | 后续可移到配置化，v1 先固定 |
 | 徽章 perfectionist 用 avgMastery 四舍五入边界（79.5→80） | 单测显式锁住行为 |
 
+---
+
+## 第四批：续会话（2026-05-09 17:00–？）
+
+### 目标
+继续基于 Top 5 候选清单：
+1. **能力等级 1-5 stars + 自适应推题端点**（候选 #2 的轻量版）
+2. **Pomodoro 浮动番茄钟**（候选 #5 的前端实现）
+
+### Phase A — Feature 3: 能力等级 + 自适应推题
+
+**backend：**
+- 新 utility 类 `MasteryLevel`：mastery_level 0-100 → 1-5 星映射，与知能行考研对齐
+  - 分桶：1星(0-20)/2星(21-40)/3星(41-60)/4星(61-80)/5星(81-100)
+  - 边界处理：null/负数→1，>100→5
+  - 7 个单测覆盖每个桶顶 + 1 越界
+- `QuizService.adaptiveGenerate(userId, subjectId, count)`：
+  - Bucket A：应复习（next_review ≤ now，按到期最早排前）
+  - Bucket B：低掌握（< 50，不在 A 中，按掌握度升序）
+  - Bucket C：未学新节点（仅 subjectId 给定时填充）
+  - 三桶合并去重，保留前 N（N×3 上限保护防 SQL IN 列表爆炸）
+- `POST /quiz/adaptive-generate?subjectId=N&count=10`（auth 必需）
+- 7 个 Mockito 单测：404/count≤0/A 优于 B/C 仅在 subject 给定时填充/学科过滤/最早到期排前
+
+**frontend：**
+- `node-detail-panel.tsx`：mastery 进度条改 5 个 lucide Star（filled/empty）+ 显示 "N 星 · M%"
+- `quizApi.adaptiveGenerate(subjectId, count)` helper（API 路径已加）
+- `quiz/practice/page.tsx`：优先调 adaptive-generate，失败/空回退到旧 `quizApi.generate`（用户无感升级）
+
+**E2E 验证（待）：**
+
+### Phase B — Feature 4: Pomodoro 浮动番茄钟（subagent 并行）
+
+派 general-purpose subagent 完成（仅前端，3 个新文件 + 1 个 layout 修改）：
+- `src/stores/pomodoro-store.ts`：zustand state（mode/secondsLeft/isRunning/completedFocusCycles/flashKey）
+- `src/hooks/use-pomodoro-tick.ts`：setInterval tick + Notification API + 切模式
+- `src/components/pomodoro/pomodoro-fab.tsx`：圆形浮动 FAB + Dialog 控制面板（25min focus / 5min break）
+- `src/components/layout/app-layout.tsx`：挂载 `<PomodoroFab />`
+
+约束：不安装新包、不写测试（前端无测试基础设施）、不破坏现有 layout。
+
+### 测试覆盖（截至本节）
+
+| 套件 | 数量 | 增量 |
+|---|---|---|
+| Backend Unit | **57** (+14) | 7 MasteryLevel + 7 QuizServiceAdaptive |
+| Backend IT | 9 | — |
+| AI Service pytest | 20 | — |
+| **Total** | **86** (+14) | **100% green** |
+
+### Commit 清单（本批）
+
+| # | commit | 说明 |
+|---|---|---|
+| 1 | (待) | feat: 能力等级 1-5 stars + 自适应推题 + Pomodoro |
+
+### 关键决策
+
+- **MasteryLevel 是 utility 类**（非 enum）— 因为分桶函数需要参数化输入（int），enum 不适合
+- **adaptive-generate 用单端点 + bucketed selection** — 而非"先调 review-queue，再调 lowest-mastery"两次 API
+- **Practice 页隐式升级**（fallback 到旧 generate）— 用户已登录则自动用 adaptive，无 token 仍能用
+- **Pomodoro 用 subagent 并行**（与 backend mvn 编译同步）— 节省墙钟时间
+- **不持久化 Pomodoro 状态**（in-memory）— 切页面会重置，v1 简化；v2 可加 zustand persist
+
+### 风险与缓解
+
+| 风险 | 缓解 |
+|---|---|
+| adaptive-generate 性能：findByUserIdWithNodeSubject 拉全部进度可能慢 | 限定结果集大小 + log 监控；后续可加 cache |
+| Pomodoro 浏览器通知权限被拒 | 静默降级（仅 visual flash），无错误 |
+| Pomodoro state 切页面丢失 | 文档化为 v1 限制，v2 加 zustand persist |
+
+
 

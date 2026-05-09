@@ -38,11 +38,23 @@ function QuizPracticeInner() {
       setResult(null);
       setSelected(null);
       try {
-        const nodesRes = await knowledgeApi.getNodes({ subjectId });
-        const nodeIds = nodesRes.data.slice(0, 20).map((n: KnowledgeNode) => n.id);
-        const quizRes = await quizApi.generate(nodeIds, 10);
+        // Feature 3: 优先调自适应推题（按应复习→低掌握→未学）；
+        // 若用户尚未登录或该端点不可用，回退到旧逻辑。
+        let questionsData: QuizQuestion[] = [];
+        try {
+          const adaptiveRes = await quizApi.adaptiveGenerate(subjectId, 10);
+          questionsData = adaptiveRes.data || [];
+        } catch (_err) {
+          // 静默降级
+        }
+        if (questionsData.length === 0) {
+          const nodesRes = await knowledgeApi.getNodes({ subjectId });
+          const nodeIds = nodesRes.data.slice(0, 20).map((n: KnowledgeNode) => n.id);
+          const quizRes = await quizApi.generate(nodeIds, 10);
+          questionsData = quizRes.data;
+        }
         if (!cancelled) {
-          setQuestions(quizRes.data);
+          setQuestions(questionsData);
           setIdx(0);
         }
       } finally {

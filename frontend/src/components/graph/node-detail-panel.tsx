@@ -10,6 +10,7 @@ import {
   BarChart3,
   ExternalLink,
   Sparkles,
+  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,15 @@ interface NodeDetailPanelProps {
   }>;
   onClose: () => void;
   onNodeClick: (nodeId: string) => void;
+}
+
+function masteryToStarsLevel(mastery100: number): number {
+  const m = Math.max(0, Math.min(100, mastery100));
+  if (m <= 20) return 1;
+  if (m <= 40) return 2;
+  if (m <= 60) return 3;
+  if (m <= 80) return 4;
+  return 5;
 }
 
 const relationLabels: Record<string, { label: string; color: string }> = {
@@ -86,21 +96,32 @@ export function NodeDetailPanel({ node, relatedNodes, onClose, onNodeClick }: No
             <Badge className={`${diffInfo.color} text-xs`}>{diffInfo.label}</Badge>
           </div>
 
-          {/* Mastery */}
+          {/* Mastery — 1-5 星能力等级（与知能行考研对齐） */}
           {node.mastery !== undefined && (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs text-gray-400 flex items-center gap-1">
                   <BarChart3 className="w-3.5 h-3.5" />
-                  掌握度
+                  能力等级
                 </span>
-                <span className="text-xs text-gray-300">{node.mastery}%</span>
+                <span className="text-xs text-gray-300">
+                  {masteryToStarsLevel(node.mastery)} 星 · {node.mastery}%
+                </span>
               </div>
-              <div className="w-full h-2 rounded-full bg-white/10 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-blue-500 transition-all"
-                  style={{ width: `${node.mastery}%` }}
-                />
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((i) => {
+                  const filled = i <= masteryToStarsLevel(node.mastery!);
+                  return (
+                    <Star
+                      key={i}
+                      className={
+                        filled
+                          ? "w-5 h-5 text-yellow-400 fill-yellow-400"
+                          : "w-5 h-5 text-gray-600"
+                      }
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
