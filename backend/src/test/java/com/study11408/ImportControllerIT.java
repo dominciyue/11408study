@@ -54,7 +54,7 @@ class ImportControllerIT extends AbstractIntegrationTest {
                 ))
         ));
 
-        mockMvc.perform(post("/api/import/materials/" + material.getId() + "/parse-pdf")
+        mockMvc.perform(post("/import/materials/" + material.getId() + "/parse-pdf")
                         .header("Authorization", auth.bearerFor(uploader)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
@@ -76,7 +76,7 @@ class ImportControllerIT extends AbstractIntegrationTest {
                 .uploader(uploader)
                 .build());
 
-        mockMvc.perform(post("/api/import/materials/" + material.getId() + "/parse-pdf")
+        mockMvc.perform(post("/import/materials/" + material.getId() + "/parse-pdf")
                         .header("Authorization", auth.bearerFor(intruder)))
                 .andExpect(status().isForbidden());
     }
@@ -84,7 +84,7 @@ class ImportControllerIT extends AbstractIntegrationTest {
     @Test
     void parsePdf_rejectsAnonymous() throws Exception {
         // Spring Security 已配 anyRequest().authenticated()，无 token 应被拒
-        mockMvc.perform(post("/api/import/materials/1/parse-pdf"))
+        mockMvc.perform(post("/import/materials/1/parse-pdf"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -106,7 +106,7 @@ class ImportControllerIT extends AbstractIntegrationTest {
                 "topic", "数据结构"
         ));
 
-        mockMvc.perform(post("/api/import/extract")
+        mockMvc.perform(post("/import/extract")
                         .header("Authorization", auth.bearerFor(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
@@ -123,7 +123,7 @@ class ImportControllerIT extends AbstractIntegrationTest {
                 "topic", "数据结构"
         ));
 
-        mockMvc.perform(post("/api/import/extract")
+        mockMvc.perform(post("/import/extract")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isUnauthorized());

@@ -60,14 +60,14 @@ class QuizControllerIT extends AbstractIntegrationTest {
                 "userAnswer", "A"
         ));
 
-        mockMvc.perform(post("/api/quiz/submit")
+        mockMvc.perform(post("/quiz/submit")
                         .header("Authorization", auth.bearerFor(user))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(submitBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.correct").value(false));
 
-        mockMvc.perform(get("/api/quiz/wrong-answers")
+        mockMvc.perform(get("/quiz/wrong-answers")
                         .header("Authorization", auth.bearerFor(user)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].questionId").value(q.getId()))

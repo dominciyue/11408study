@@ -35,7 +35,7 @@ class NoteControllerIT extends AbstractIntegrationTest {
                 "title", "t1",
                 "content", "c1"
         ));
-        mockMvc.perform(post("/api/notes")
+        mockMvc.perform(post("/notes")
                         .header("Authorization", auth.bearerFor(alice))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody))
@@ -52,14 +52,14 @@ class NoteControllerIT extends AbstractIntegrationTest {
                 "title", "t2",
                 "content", "c2"
         ));
-        mockMvc.perform(put("/api/notes/" + note.getId())
+        mockMvc.perform(put("/notes/" + note.getId())
                         .header("Authorization", auth.bearerFor(bob))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(updateBody))
                 .andExpect(status().isForbidden());
 
         // Bob cannot delete
-        mockMvc.perform(delete("/api/notes/" + note.getId())
+        mockMvc.perform(delete("/notes/" + note.getId())
                         .header("Authorization", auth.bearerFor(bob)))
                 .andExpect(status().isForbidden());
     }

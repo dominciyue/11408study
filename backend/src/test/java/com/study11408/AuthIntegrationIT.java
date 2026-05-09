@@ -38,7 +38,7 @@ class AuthIntegrationIT extends AbstractIntegrationTest {
                 "password", "password123"
         ));
 
-        MvcResult result = mockMvc.perform(post("/api/auth/register")
+        MvcResult result = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isOk())
@@ -66,7 +66,7 @@ class AuthIntegrationIT extends AbstractIntegrationTest {
                 "email", "jwtlog@test.local",
                 "password", "password123"
         ));
-        MvcResult regResult = mockMvc.perform(post("/api/auth/register")
+        MvcResult regResult = mockMvc.perform(post("/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(regBody))
                 .andExpect(status().isOk())
@@ -79,7 +79,7 @@ class AuthIntegrationIT extends AbstractIntegrationTest {
                 "username", "jwtlog",
                 "password", "password123"
         ));
-        MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+        MvcResult loginResult = mockMvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody))
                 .andExpect(status().isOk())
