@@ -2,11 +2,13 @@ package com.study11408.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -17,9 +19,20 @@ public class AiClientService {
     private final RestTemplate restTemplate;
     private final String aiServiceUrl;
 
-    public AiClientService(@Value("${app.ai.service-url}") String aiServiceUrl) {
-        this.restTemplate = new RestTemplate();
+    public AiClientService(
+            @Value("${app.ai.service-url}") String aiServiceUrl,
+            RestTemplateBuilder restTemplateBuilder,
+            @Value("${app.ai.connect-timeout-ms:5000}") int connectTimeoutMs,
+            @Value("${app.ai.read-timeout-ms:120000}") int readTimeoutMs) {
         this.aiServiceUrl = aiServiceUrl;
+        // P0-06: configure timeouts so a hung AI service cannot exhaust the
+        // backend worker thread pool. connect=5s (TCP setup should be fast),
+        // read=120s (LLM calls may take 30-90s; aligned with nginx /ai/
+        // proxy_read_timeout 120s).
+        this.restTemplate = restTemplateBuilder
+                .setConnectTimeout(Duration.ofMillis(connectTimeoutMs))
+                .setReadTimeout(Duration.ofMillis(readTimeoutMs))
+                .build();
     }
 
     @SuppressWarnings("unchecked")
