@@ -118,6 +118,18 @@ export const quizApi = {
     ),
   getWrongAnswers: () =>
     api.get<unknown, ApiResponse<WrongAnswer[]>>("/quiz/wrong-answers"),
+  aiExplain: (
+    questionId: number,
+    body: {
+      userAnswer: string;
+      history?: { role: "user" | "assistant"; content: string }[];
+    }
+  ) =>
+    api.post<unknown, ApiResponse<{ reply?: string; error?: string }>>(
+      `/quiz/${questionId}/ai-explain`,
+      body,
+      { timeout: 90000 } // LLM 调用 5-30s 不等，避免被默认 15s 超时截掉
+    ),
 };
 
 // ─── Materials ───────────────────────────────────────────────────────────────

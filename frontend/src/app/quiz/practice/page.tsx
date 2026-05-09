@@ -2,12 +2,13 @@
 
 import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ClipboardCheck, ChevronLeft, ChevronRight } from "lucide-react";
+import { ClipboardCheck, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import { knowledgeApi, quizApi } from "@/lib/api";
 import type { KnowledgeNode, QuizQuestion } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import AiExplainDialog from "@/components/quiz/ai-explain-dialog";
 
 function parseOptions(options?: string): string[] {
   if (!options) return [];
@@ -28,6 +29,7 @@ function QuizPracticeInner() {
   const [selected, setSelected] = useState<string | null>(null);
   const [result, setResult] = useState<{ correct: boolean; correctAnswer: string; explanation?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [aiOpen, setAiOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,15 +121,37 @@ function QuizPracticeInner() {
               </div>
 
               {result ? (
-                <div className="p-4 rounded-xl border border-white/[0.08] bg-white/5">
-                  <div className={result.correct ? "text-green-400 font-medium" : "text-red-400 font-medium"}>
-                    {result.correct ? "回答正确" : "回答错误"}
+                <div className="p-4 rounded-xl border border-white/[0.08] bg-white/5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className={result.correct ? "text-green-400 font-medium" : "text-red-400 font-medium"}>
+                      {result.correct ? "回答正确" : "回答错误"}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-blue-500/30 text-blue-300 hover:bg-blue-500/10"
+                      onClick={() => setAiOpen(true)}
+                      disabled={!q || !selected}
+                    >
+                      <Sparkles className="w-4 h-4 mr-1.5" />
+                      AI 启发式讲题
+                    </Button>
                   </div>
-                  <div className="text-sm text-gray-300 mt-2">正确答案：{result.correctAnswer}</div>
+                  <div className="text-sm text-gray-300">正确答案：{result.correctAnswer}</div>
                   {result.explanation ? (
-                    <div className="text-sm text-gray-400 mt-2 whitespace-pre-wrap">{result.explanation}</div>
+                    <div className="text-sm text-gray-400 whitespace-pre-wrap">{result.explanation}</div>
                   ) : null}
                 </div>
+              ) : null}
+
+              {q && selected ? (
+                <AiExplainDialog
+                  open={aiOpen}
+                  onOpenChange={setAiOpen}
+                  questionId={q.id}
+                  userAnswer={selected}
+                  questionPreview={q.content}
+                />
               ) : null}
             </>
           ) : (

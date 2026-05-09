@@ -1,6 +1,7 @@
 package com.study11408.controller;
 
 import com.study11408.dto.ApiResponse;
+import com.study11408.dto.QuizAiExplainRequest;
 import com.study11408.dto.QuizSubmitRequest;
 import com.study11408.dto.WrongAnswerDTO;
 import com.study11408.entity.QuizQuestion;
@@ -47,6 +48,16 @@ public class QuizController {
     public ApiResponse<List<WrongAnswerDTO>> getWrongAnswers(HttpServletRequest request) {
         Long userId = getUserId(request);
         return ApiResponse.ok(quizService.getWrongAnswers(userId));
+    }
+
+    @Operation(summary = "AI 启发式讲题")
+    @PostMapping("/{questionId}/ai-explain")
+    public ApiResponse<Map<String, Object>> aiExplain(
+            HttpServletRequest request,
+            @PathVariable Long questionId,
+            @Valid @RequestBody QuizAiExplainRequest body) {
+        Long userId = getUserId(request);
+        return ApiResponse.ok(quizService.explainWithAi(userId, questionId, body));
     }
 
     private Long getUserId(HttpServletRequest request) {

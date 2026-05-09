@@ -105,19 +105,29 @@ class LLMService:
         system_prompt: Optional[str] = None,
         temperature: float = 0.7,
     ) -> str:
+        """单轮便捷接口：构造 system+user messages 后委托 chat()。"""
+        messages: list[dict] = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        return await self.chat(messages, temperature=temperature)
+
+    async def chat(
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+    ) -> str:
+        """多轮 chat 接口。messages 形如 OpenAI 风格 [{role, content}]，
+        包含 system/user/assistant。"""
         max_retries = 3
         last_error: Optional[Exception] = None
 
         for attempt in range(1, max_retries + 1):
             try:
                 if self.settings.llm_provider == "anthropic":
-                    return await self._generate_anthropic(
-                        prompt, system_prompt, temperature
-                    )
+                    return await self._chat_anthropic(messages, temperature)
                 else:
-                    return await self._generate_openai(
-                        prompt, system_prompt, temperature
-                    )
+                    return await self._chat_openai(messages, temperature)
             except Exception as e:
                 last_error = e
                 if not _is_retryable(e):
@@ -140,18 +150,12 @@ class LLMService:
             f"LLM 调用在 {max_retries} 次尝试后仍然失败: {last_error}"
         )
 
-    async def _generate_openai(
+    async def _chat_openai(
         self,
-        prompt: str,
-        system_prompt: Optional[str],
+        messages: list[dict],
         temperature: float,
     ) -> str:
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-
-        logger.debug("调用 OpenAI 模型: %s", self.settings.openai_model)
+        logger.debug("调用 OpenAI 模型: %s, messages=%d", self.settings.openai_model, len(messages))
         response = await self.openai_client.chat.completions.create(
             model=self.settings.openai_model,
             messages=messages,
@@ -161,22 +165,30 @@ class LLMService:
         logger.debug("OpenAI 响应长度: %d", len(content) if content else 0)
         return content or ""
 
-    async def _generate_anthropic(
+    async def _chat_anthropic(
         self,
-        prompt: str,
-        system_prompt: Optional[str],
+        messages: list[dict],
         temperature: float,
     ) -> str:
+        # Anthropic 把 system 单独传，不属于 messages
+        system_msg = next(
+            (m["content"] for m in messages if m["role"] == "system"), None
+        )
+        user_assistant_msgs = [m for m in messages if m["role"] != "system"]
         kwargs: dict = {
             "model": self.settings.anthropic_model,
             "max_tokens": 4096,
             "temperature": temperature,
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": user_assistant_msgs,
         }
-        if system_prompt:
-            kwargs["system"] = system_prompt
+        if system_msg:
+            kwargs["system"] = system_msg
 
-        logger.debug("调用 Anthropic 模型: %s", self.settings.anthropic_model)
+        logger.debug(
+            "调用 Anthropic 模型: %s, messages=%d",
+            self.settings.anthropic_model,
+            len(user_assistant_msgs),
+        )
         response = await self.anthropic_client.messages.create(**kwargs)
         content = response.content[0].text
         logger.debug("Anthropic 响应长度: %d", len(content) if content else 0)

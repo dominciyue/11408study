@@ -10,6 +10,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -94,6 +95,32 @@ public class AiClientService {
             return response.getBody();
         } catch (RestClientException e) {
             log.error("AI内容增强服务调用失败", e);
+            return Map.of("error", "AI服务暂不可用");
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> explainQuestion(
+            Map<String, Object> question,
+            String userAnswer,
+            Map<String, Object> knowledgeNode,
+            List<Map<String, String>> history) {
+        try {
+            Map<String, Object> request = new HashMap<>();
+            request.put("question", question);
+            request.put("user_answer", userAnswer);
+            if (knowledgeNode != null) {
+                request.put("knowledge_node", knowledgeNode);
+            }
+            if (history != null && !history.isEmpty()) {
+                request.put("history", history);
+            }
+
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    aiServiceUrl + "/ai/explain-question", request, Map.class);
+            return response.getBody();
+        } catch (RestClientException e) {
+            log.error("AI讲题服务调用失败", e);
             return Map.of("error", "AI服务暂不可用");
         }
     }

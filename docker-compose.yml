@@ -57,6 +57,8 @@ services:
     build:
       context: ./ai-service
       dockerfile: Dockerfile
+    env_file:
+      - ./ai-service/.env
     environment:
       DEBUG: "false"
     ports:

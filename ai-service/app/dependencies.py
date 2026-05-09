@@ -4,10 +4,12 @@ from app.config import settings
 from app.services.llm_service import LLMService
 from app.services.knowledge_service import KnowledgeService
 from app.services.pdf_parser import PDFParserService
+from app.services.quiz_explain_service import QuizExplainService
 
 _llm_service: LLMService | None = None
 _knowledge_service: KnowledgeService | None = None
 _pdf_parser_service: PDFParserService | None = None
+_quiz_explain_service: QuizExplainService | None = None
 
 
 def get_llm_service() -> LLMService:
@@ -29,3 +31,10 @@ def get_pdf_parser_service() -> PDFParserService:
     if _pdf_parser_service is None:
         _pdf_parser_service = PDFParserService()
     return _pdf_parser_service
+
+
+def get_quiz_explain_service() -> QuizExplainService:
+    global _quiz_explain_service
+    if _quiz_explain_service is None:
+        _quiz_explain_service = QuizExplainService(get_llm_service())
+    return _quiz_explain_service

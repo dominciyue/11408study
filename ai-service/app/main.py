@@ -12,6 +12,7 @@ from app.routers import (
     relation_suggest,
     content_enhance,
     pdf_parse,
+    quiz_explain,
 )
 
 logging.basicConfig(
@@ -68,6 +69,7 @@ app.include_router(quiz_generate.router, prefix="/ai", tags=["测验生成"])
 app.include_router(relation_suggest.router, prefix="/ai", tags=["关系分析"])
 app.include_router(content_enhance.router, prefix="/ai", tags=["内容增强"])
 app.include_router(pdf_parse.router, prefix="/ai", tags=["PDF解析"])
+app.include_router(quiz_explain.router, prefix="/ai", tags=["AI讲题"])
 
 
 @app.get("/ai/health")
