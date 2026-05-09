@@ -169,4 +169,74 @@ class ImportControllerUnitTest {
         assertThat(resp.getData()).isNotNull();
         assertThat(resp.getData().getKnowledgePoints()).hasSize(1);
     }
+
+    // "PDF 出处定位"：ai-service 返回 source_excerpt 时应透传到 DTO
+    @Test
+    void extract_should_propagate_source_excerpt_when_present() {
+        when(jwtTokenProvider.resolveToken(request)).thenReturn("faketoken");
+        when(jwtTokenProvider.getUserId("faketoken")).thenReturn(42L);
+        lenient().when(aiClientService.extractKnowledge("text", "408", "数据结构")).thenReturn(Map.of(
+                "raw_text", "raw",
+                "knowledge_points", List.of(Map.of(
+                        "title", "栈",
+                        "content", "LIFO 数据结构",
+                        "difficulty", "EASY",
+                        "source_excerpt", "栈是一种后进先出的线性表。"
+                ))
+        ));
+
+        ImportKnowledgeExtractRequest body = new ImportKnowledgeExtractRequest();
+        body.setText("text");
+        body.setSubject("408");
+        body.setTopic("数据结构");
+
+        ApiResponse<ImportKnowledgeExtractResponse> resp = controller.extract(body, request);
+        assertThat(resp.getData().getKnowledgePoints()).hasSize(1);
+        assertThat(resp.getData().getKnowledgePoints().get(0).getSourceExcerpt())
+                .isEqualTo("栈是一种后进先出的线性表。");
+    }
+
+    @Test
+    void extract_should_treat_blank_source_excerpt_as_null() {
+        // ai-service 在原文不足时被允许返回空字符串；DTO 层应规整为 null，
+        // 避免前端渲染空白"出处"块
+        when(jwtTokenProvider.resolveToken(request)).thenReturn("faketoken");
+        when(jwtTokenProvider.getUserId("faketoken")).thenReturn(42L);
+        lenient().when(aiClientService.extractKnowledge("text", null, null)).thenReturn(Map.of(
+                "raw_text", "raw",
+                "knowledge_points", List.of(Map.of(
+                        "title", "T",
+                        "content", "C",
+                        "difficulty", "EASY",
+                        "source_excerpt", "   "
+                ))
+        ));
+
+        ImportKnowledgeExtractRequest body = new ImportKnowledgeExtractRequest();
+        body.setText("text");
+
+        ApiResponse<ImportKnowledgeExtractResponse> resp = controller.extract(body, request);
+        assertThat(resp.getData().getKnowledgePoints().get(0).getSourceExcerpt()).isNull();
+    }
+
+    @Test
+    void extract_should_handle_missing_source_excerpt_gracefully() {
+        // 老 ai-service 回包不含该字段时不应 NPE
+        when(jwtTokenProvider.resolveToken(request)).thenReturn("faketoken");
+        when(jwtTokenProvider.getUserId("faketoken")).thenReturn(42L);
+        lenient().when(aiClientService.extractKnowledge("text", null, null)).thenReturn(Map.of(
+                "raw_text", "raw",
+                "knowledge_points", List.of(Map.of(
+                        "title", "T",
+                        "content", "C",
+                        "difficulty", "EASY"
+                ))
+        ));
+
+        ImportKnowledgeExtractRequest body = new ImportKnowledgeExtractRequest();
+        body.setText("text");
+
+        ApiResponse<ImportKnowledgeExtractResponse> resp = controller.extract(body, request);
+        assertThat(resp.getData().getKnowledgePoints().get(0).getSourceExcerpt()).isNull();
+    }
 }

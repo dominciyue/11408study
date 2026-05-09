@@ -627,3 +627,73 @@ WeakKey 修了之后跑 IT，又发现：
 
 
 
+
+---
+
+## 第八批：续会话（2026-05-09 18:10–？）
+
+### 目标
+按用户清单一次完成 4 个特性：
+1. **Feature 1 PDF 出处定位**（subagent A）— ai-service extract 加 source_excerpt + V5 新表 knowledge_node_sources（基础设施）+ 前端展示
+2. **Feature 2 AI 学习计划入库**（subagent B）— V6 新表 study_plans + 替换前端 localStorage 为 list/get/delete REST
+3. **Feature 3 错题本增强**（inline）— PUT resolve 端点 + 前端按 topic 分组 + 标记已解决按钮
+4. **Feature 4 进度自动创建**（inline）— POST /study/progress/touch 幂等 + 节点详情打开时自动调
+
+### 并行编排（防冲突）
+- Subagent A：碰 ai-service + ImportController + KnowledgeNodeSource + node-detail-panel.tsx 出处区块；明确告知"不要碰 study/* 和 StudyController"
+- Subagent B：碰 StudyPathService + StudyController + study_plans 表 + /study/plan 重写；明确告知"不要碰 graph/* 和 KnowledgeNodeSource"
+- 主对话：先做 Feature 4（顺手在 StudyController 加 touch 端点）→ 再 dispatch Subagent B（B 看到 #4 的 diff）→ 同时 inline Feature 3（错题本与上述无重叠）
+
+### 落地清单
+
+**Feature 1（subagent A）**
+- ai-service: KnowledgePoint 加 `source_excerpt`（≤120 字原文片段），extract prompt 追加要求；新增 6 个 pytest
+- backend V5 migration `knowledge_node_sources` 表（node_id + material_id + page_number + excerpt）
+- KnowledgeNodeSource Entity + Repository + 4 个单测
+- ImportKnowledgeExtractResponse DTO 加 `sourceExcerpt`，ImportController 透传
+- 前端 node-detail-panel 加可选 sources?[] prop + 折叠出处区块
+- **决策**：当前 extract 端点是预览态不入库 knowledge_nodes，所以 KnowledgeNodeSource 表当前无写入路径，作为后续真实入库流程的预备基础设施
+
+**Feature 2（subagent B + 主对话补完页）**
+- backend V6 migration `study_plans` 表（user_id + subject_id + weeks + goal + summary + plan_json + ts）
+- StudyPlan Entity + Repository + 11 个 Mockito 单测
+- StudyPathService 改 generateAiPlan 同时入库（去 readOnly），返 map 加 planId；新增 listUserPlans / getUserPlan / deleteUserPlan
+- StudyController 加 GET/list、GET/detail、DELETE 三端点
+- 前端 /study/plan 重写：删 localStorage，加 History 卡片（横滚多份计划 + 删除）+ 切换激活计划
+
+**Feature 3（inline）**
+- WrongAnswer Repository 加 findByIdAndUserId（ownership 校验）
+- WrongAnswerDTO 加 topicName + nodeTitle，toWrongAnswerDTO 沿 question.node.topic 链填充
+- QuizService.markWrongAnswerResolved 幂等 + ownership 校验
+- PUT /quiz/wrong-answers/{id}/resolve 端点
+- 前端 /quiz/wrong 按 topicName 分组（折叠）+ 每条加 "已解决" 按钮 + 标记后从未解决列表移除
+
+**Feature 4（inline）**
+- StudyPathService.touchProgress(userId, nodeId) 幂等：未存在则建 mastery=0
+- POST /study/progress/touch?nodeId=N 端点
+- 前端 node-detail-panel useEffect 在 node 变化时静默调 touchProgress
+
+### 测试覆盖（截至本节）
+
+| 套件 | 数量 | 增量 |
+|---|---|---|
+| Backend Unit | **111** (+9 net) | 4 KnowledgeNodeSource + 11 StudyPathServiceAiPlanPersistence + 3 ImportControllerUnitTest |
+| Backend IT | 9 | — |
+| AI Service pytest | **41** (+6) | 6 test_knowledge_extract |
+| **Total** | **161** | **+15** |
+
+### Commit 清单（本批）
+
+| # | commit | 说明 |
+|---|---|---|
+| 1 | (待) | feat: PDF 出处 + 学习计划入库 + 错题本增强 + 进度自动创建（4 特性合一） |
+
+### 关键决策
+
+- **冲突防御编排**：subagent A 与主对话 + subagent B 三路并行，靠"分工 + 不重叠文件路径"避撞；中途主对话编辑 WrongAnswerDTO 与 Repository 被 subagent 进程"覆盖"过一次，靠 re-Edit 修复 — 写实留痕
+- **Feature 1 KnowledgeNodeSource 表先建后用**：当前 extract 端点是预览态，后续会话补"真实入库"时直接 INSERT 即可
+- **Feature 2 plan_json 走 TEXT + ObjectMapper.writeValueAsString**：避免 JSONB 跨数据库兼容性，前端 JSON.parse 还原；与现有 quiz options 模式对齐
+- **Feature 2 入库容错**：序列化或 DB 异常只 log.warn，返回 map 不带 planId；用户至少能看到本次生成的 plan
+- **Feature 2 planId 注入**：用 new HashMap<>(aiResp) wrapper 因为 Map.of(...) 不可变
+- **Feature 3 标记后从未解决列表移除**：getWrongAnswers 只返 resolved=false，前端本地剔除即可
+- **Feature 4 在 node-detail-panel useEffect 静默调用**：失败不影响浏览，dashboard 已学指标自然增长

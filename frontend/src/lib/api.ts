@@ -18,6 +18,7 @@ import type {
   StudyFeedback,
   QuizSubmission,
   StatsOverview,
+  StudyPlanRecord,
   WeeklyReport,
   User,
 } from "@/types";
@@ -108,6 +109,10 @@ export const studyApi = {
     api.get<unknown, ApiResponse<StudyProgress[]>>("/study/progress"),
   getNodeProgress: (nodeId: number) =>
     api.get<unknown, ApiResponse<StudyProgress>>(`/study/progress/${nodeId}`),
+  touchProgress: (nodeId: number) =>
+    api.post<unknown, ApiResponse<StudyProgress>>("/study/progress/touch", null, {
+      params: { nodeId },
+    }),
   submitFeedback: (data: StudyFeedback) =>
     api.post<unknown, ApiResponse<void>>("/study/feedback", data),
   getReviewQueue: () =>
@@ -119,11 +124,21 @@ export const studyApi = {
   endSession: (sessionId: number) =>
     api.put<unknown, ApiResponse<StudySession>>(`/study/sessions/${sessionId}/end`),
   aiPlan: (body: { subjectId?: number; weeks: number; goal: string }) =>
-    api.post<unknown, ApiResponse<{ plan?: unknown[]; summary?: string; error?: string }>>(
+    api.post<
+      unknown,
+      ApiResponse<{ plan?: unknown[]; summary?: string; error?: string; planId?: number }>
+    >(
       "/study/ai-plan",
       body,
       { timeout: 120000 } // LLM 周计划生成可能 20-60s
     ),
+  // —— v2: AI 周计划入库 ——
+  listPlans: () =>
+    api.get<unknown, ApiResponse<StudyPlanRecord[]>>("/study/ai-plans"),
+  getPlan: (planId: number) =>
+    api.get<unknown, ApiResponse<StudyPlanRecord>>(`/study/ai-plans/${planId}`),
+  deletePlan: (planId: number) =>
+    api.delete<unknown, ApiResponse<void>>(`/study/ai-plans/${planId}`),
 };
 
 // ─── Quiz ────────────────────────────────────────────────────────────────────
@@ -154,6 +169,11 @@ export const quizApi = {
       `/quiz/${questionId}/ai-explain`,
       body,
       { timeout: 90000 } // LLM 调用 5-30s 不等，避免被默认 15s 超时截掉
+    ),
+  resolveWrongAnswer: (wrongAnswerId: number) =>
+    api.put<unknown, ApiResponse<WrongAnswer>>(
+      `/quiz/wrong-answers/${wrongAnswerId}/resolve`,
+      null
     ),
   generateForNode: (
     nodeId: number,

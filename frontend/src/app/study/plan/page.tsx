@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Sparkles,
@@ -12,49 +12,13 @@ import {
   RotateCcw,
   ListChecks,
   Trash2,
+  History,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { studyApi, subjectsApi } from "@/lib/api";
-import type { Subject, WeekPlan } from "@/types";
-
-const STORAGE_KEY = "study11408:ai-plan-v1";
-
-interface SavedPlan {
-  generatedAt: string;
-  subjectId?: number;
-  subjectName?: string;
-  weeks: number;
-  goal: string;
-  summary?: string;
-  plan: WeekPlan[];
-}
-
-function loadSavedPlan(): SavedPlan | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as SavedPlan;
-  } catch {
-    return null;
-  }
-}
-
-function saveSavedPlan(plan: SavedPlan): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(plan));
-  } catch {
-    // quota exceeded — silent
-  }
-}
-
-function clearSavedPlan(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(STORAGE_KEY);
-}
+import type { Subject, WeekPlan, StudyPlanRecord } from "@/types";
 
 function extractErrorMessage(err: unknown): string {
   if (typeof err === "string") return err;
@@ -66,6 +30,17 @@ function extractErrorMessage(err: unknown): string {
   return "AI 调用失败，请稍后重试";
 }
 
+/** 安全解析 plan_json → WeekPlan[]；解析失败返回空数组（避免页面崩溃）。 */
+function parsePlanJson(json: string | undefined | null): WeekPlan[] {
+  if (!json) return [];
+  try {
+    const arr = JSON.parse(json);
+    return Array.isArray(arr) ? (arr as WeekPlan[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function StudyPlanPage() {
   const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -74,8 +49,12 @@ export default function StudyPlanPage() {
   const [goal, setGoal] = useState<string>("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState<SavedPlan | null>(null);
 
+  const [plans, setPlans] = useState<StudyPlanRecord[]>([]);
+  const [activePlanId, setActivePlanId] = useState<number | null>(null);
+  const [listLoading, setListLoading] = useState(true);
+
+  // —— 初始化：拉学科 + 用户历史计划 ——
   useEffect(() => {
     subjectsApi
       .list()
@@ -83,8 +62,31 @@ export default function StudyPlanPage() {
       .catch(() => {
         // 静默：表单仍可用
       });
-    setSaved(loadSavedPlan());
+    refreshPlans(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * 拉取用户历史计划。selectLatest=true 时把 activePlanId 切到最新一条
+   * （首次进入页面 / 生成新计划后调用）。
+   */
+  async function refreshPlans(selectLatest: boolean) {
+    setListLoading(true);
+    try {
+      const res = await studyApi.listPlans();
+      const list = res.data || [];
+      setPlans(list);
+      if (selectLatest && list.length > 0) {
+        setActivePlanId(list[0].id);
+      } else if (list.length === 0) {
+        setActivePlanId(null);
+      }
+    } catch {
+      // 静默：表单仍可用，列表区会显示"暂无历史计划"
+    } finally {
+      setListLoading(false);
+    }
+  }
 
   async function generate() {
     const trimmedGoal = goal.trim();
@@ -106,18 +108,12 @@ export default function StudyPlanPage() {
         setError(data.error || "AI 未生成有效计划，请稍后重试");
         return;
       }
-      const subjectName = subjects.find((s) => s.id === subjectId)?.name;
-      const next: SavedPlan = {
-        generatedAt: new Date().toISOString(),
-        subjectId,
-        subjectName,
-        weeks,
-        goal: trimmedGoal,
-        summary: typeof data.summary === "string" ? data.summary : undefined,
-        plan: planArr,
-      };
-      saveSavedPlan(next);
-      setSaved(next);
+      // 优先用后端返回的 planId 选中；fallback 到 refresh 后取最新
+      const newPlanId = typeof data.planId === "number" ? data.planId : null;
+      await refreshPlans(newPlanId === null);
+      if (newPlanId !== null) {
+        setActivePlanId(newPlanId);
+      }
     } catch (err: unknown) {
       setError(extractErrorMessage(err));
     } finally {
@@ -125,10 +121,38 @@ export default function StudyPlanPage() {
     }
   }
 
-  function handleClear() {
-    clearSavedPlan();
-    setSaved(null);
+  async function handleDelete(planId: number, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!window.confirm("确认删除此份学习计划？")) return;
+    try {
+      await studyApi.deletePlan(planId);
+      // 本地剔除 + 切换 active：若删的就是当前激活的，切到剩余的最新一条
+      setPlans((prev) => {
+        const next = prev.filter((p) => p.id !== planId);
+        if (planId === activePlanId) {
+          setActivePlanId(next.length > 0 ? next[0].id : null);
+        }
+        return next;
+      });
+    } catch (err: unknown) {
+      setError(extractErrorMessage(err));
+    }
   }
+
+  // —— 当前展示的计划 + 解析 ——
+  const activePlan = useMemo(
+    () => plans.find((p) => p.id === activePlanId) || null,
+    [plans, activePlanId]
+  );
+  const activeWeeks: WeekPlan[] = useMemo(
+    () => parsePlanJson(activePlan?.planJson),
+    [activePlan]
+  );
+  const activeSubjectName = useMemo(() => {
+    if (!activePlan) return null;
+    if (activePlan.subjectId == null) return "全部学科";
+    return subjects.find((s) => s.id === activePlan.subjectId)?.name || null;
+  }, [activePlan, subjects]);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -138,7 +162,7 @@ export default function StudyPlanPage() {
           <div>
             <h1 className="text-2xl font-bold text-white">AI 学习计划生成</h1>
             <p className="text-gray-400 text-sm mt-1">
-              基于你的学科、目标和当前进度，DeepSeek 为你生成个性化周计划
+              基于你的学科、目标和当前进度，DeepSeek 为你生成个性化周计划（已云端同步）
             </p>
           </div>
         </div>
@@ -152,6 +176,78 @@ export default function StudyPlanPage() {
           返回学习模式
         </Button>
       </div>
+
+      {/* 历史计划横向滚动条 */}
+      <Card className="border-white/[0.06]">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm text-gray-300 flex items-center gap-2">
+            <History className="w-4 h-4 text-blue-400" />
+            历史计划
+            <span className="text-xs text-gray-500 font-normal">
+              （共 {plans.length} 份）
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {listLoading ? (
+            <div className="text-xs text-gray-500 flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              加载中...
+            </div>
+          ) : plans.length === 0 ? (
+            <div className="text-xs text-gray-500">暂无历史计划，先在下方生成一份吧</div>
+          ) : (
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+              {plans.map((p, idx) => {
+                const active = p.id === activePlanId;
+                const label = `第 ${plans.length - idx} 份`;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setActivePlanId(p.id)}
+                    className={`group flex items-center gap-2 shrink-0 rounded-lg border px-3 py-2 text-xs transition ${
+                      active
+                        ? "border-purple-500/60 bg-purple-500/15 text-purple-100"
+                        : "border-white/[0.08] bg-white/[0.03] text-gray-300 hover:bg-white/[0.06]"
+                    }`}
+                  >
+                    <Badge
+                      className={
+                        active
+                          ? "bg-purple-500/30 text-purple-100"
+                          : "bg-white/[0.06] text-gray-300"
+                      }
+                    >
+                      {label}
+                    </Badge>
+                    <span className="font-medium">{p.weeks} 周</span>
+                    <span className="text-gray-500 hidden sm:inline">
+                      · {new Date(p.createdAt).toLocaleDateString()}
+                    </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      aria-label="删除此计划"
+                      onClick={(e) => handleDelete(p.id, e)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          handleDelete(
+                            p.id,
+                            e as unknown as React.MouseEvent<HTMLSpanElement>
+                          );
+                        }
+                      }}
+                      className="ml-1 rounded p-0.5 text-gray-400 hover:text-red-300 hover:bg-red-500/10 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 表单 */}
       <Card className="border-white/[0.06]">
@@ -206,13 +302,8 @@ export default function StudyPlanPage() {
               className="w-full rounded-lg border border-white/[0.08] bg-white/5 px-3 py-2 text-sm text-gray-200 outline-none focus:border-purple-500/40 resize-none disabled:opacity-50"
             />
           </div>
-          {error ? (
-            <div className="text-sm text-red-400">{error}</div>
-          ) : null}
-          <div className="flex justify-between items-center">
-            <div className="text-xs text-gray-500">
-              {saved ? `上一份计划：${new Date(saved.generatedAt).toLocaleString()}` : "暂无历史计划"}
-            </div>
+          {error ? <div className="text-sm text-red-400">{error}</div> : null}
+          <div className="flex justify-end items-center">
             <Button
               onClick={generate}
               disabled={pending || !goal.trim()}
@@ -235,42 +326,34 @@ export default function StudyPlanPage() {
       </Card>
 
       {/* 周计划展示 */}
-      {saved ? (
+      {activePlan ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-200 flex items-center gap-2">
                 <CalendarRange className="w-5 h-5 text-blue-400" />
-                {saved.weeks} 周计划
+                {activePlan.weeks} 周计划
               </h2>
               <p className="text-xs text-gray-500 mt-1">
-                目标：{saved.goal}
-                {saved.subjectName ? ` · 学科：${saved.subjectName}` : ""}
+                目标：{activePlan.goal}
+                {activeSubjectName ? ` · 学科：${activeSubjectName}` : ""}
+                {` · 创建于 ${new Date(activePlan.createdAt).toLocaleString()}`}
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-red-500/20 text-red-300 hover:bg-red-500/10"
-              onClick={handleClear}
-            >
-              <Trash2 className="w-4 h-4 mr-1" />
-              清除
-            </Button>
           </div>
 
-          {saved.summary ? (
+          {activePlan.summary ? (
             <Card className="border-purple-500/20 bg-purple-500/5">
               <CardContent className="p-4">
                 <p className="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">
-                  {saved.summary}
+                  {activePlan.summary}
                 </p>
               </CardContent>
             </Card>
           ) : null}
 
           <div className="space-y-3">
-            {saved.plan.map((w) => (
+            {activeWeeks.map((w) => (
               <Card key={w.week} className="border-white/[0.06]">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base text-gray-200 flex items-center gap-2">

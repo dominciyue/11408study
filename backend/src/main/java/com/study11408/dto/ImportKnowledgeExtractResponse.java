@@ -25,6 +25,12 @@ public class ImportKnowledgeExtractResponse {
         private String content;
         private String difficulty; // EASY/MEDIUM/HARD
         private List<Map<String, Object>> suggestedRelations;
+        /**
+         * "PDF 出处定位"用：来自 ai-service 的原文 1-3 句直接引用（≤120 字）。
+         * 当前由前端展示；后续若 extract 落库 knowledge_nodes 时会同步写入
+         * knowledge_node_sources 表。
+         */
+        private String sourceExcerpt;
     }
 }
 

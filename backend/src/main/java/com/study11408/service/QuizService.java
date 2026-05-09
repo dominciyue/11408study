@@ -341,6 +341,21 @@ public class QuizService {
                 .toList();
     }
 
+    /**
+     * 标记错题为已解决（用户在错题本上点 ✓）。带 ownership 校验。
+     */
+    @Transactional
+    public WrongAnswerDTO markWrongAnswerResolved(Long userId, Long wrongAnswerId) {
+        WrongAnswer w = wrongAnswerRepository.findByIdAndUserId(wrongAnswerId, userId)
+                .orElseThrow(() -> new BusinessException("错题不存在或无权限", HttpStatus.NOT_FOUND));
+        if (Boolean.TRUE.equals(w.getResolved())) {
+            return toWrongAnswerDTO(w);  // 幂等：已解决则直接返回
+        }
+        w.setResolved(true);
+        wrongAnswerRepository.save(w);
+        return toWrongAnswerDTO(w);
+    }
+
     @Transactional(readOnly = true)
     public Map<String, Object> explainWithAi(Long userId, Long questionId, QuizAiExplainRequest req) {
         if (!userRepository.existsById(userId)) {
@@ -398,6 +413,15 @@ public class QuizService {
 
     private WrongAnswerDTO toWrongAnswerDTO(WrongAnswer wrongAnswer) {
         QuizQuestion q = wrongAnswer.getQuestion();
+        KnowledgeNode n = (q != null) ? q.getNode() : null;
+        String topicName = null;
+        String nodeTitle = null;
+        if (n != null) {
+            nodeTitle = n.getTitle();
+            if (n.getTopic() != null) {
+                topicName = n.getTopic().getName();
+            }
+        }
         return WrongAnswerDTO.builder()
                 .id(wrongAnswer.getId())
                 .questionId(wrongAnswer.getQuestionId())
@@ -408,6 +432,8 @@ public class QuizService {
                 .explanation(q != null ? q.getExplanation() : null)
                 .answeredAt(wrongAnswer.getAnsweredAt())
                 .resolved(wrongAnswer.getResolved())
+                .topicName(topicName)
+                .nodeTitle(nodeTitle)
                 .build();
     }
 }

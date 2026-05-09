@@ -159,6 +159,8 @@ export interface WrongAnswer {
   questionId: number;
   nodeId?: number;
   questionText?: string;
+  topicName?: string;
+  nodeTitle?: string;
   userAnswer: string;
   correctAnswer?: string;
   explanation?: string;
@@ -224,6 +226,24 @@ export interface StudyPlanResponse {
   plan: WeekPlan[];
   summary?: string;
   error?: string;
+  /** 后端入库成功时返回的 plan id，失败/未入库时缺省 */
+  planId?: number;
+}
+
+/**
+ * 后端 study_plans 表的 DTO 形态（GET /study/ai-plans 返回）。
+ * planJson 是 ObjectMapper.writeValueAsString(WeekPlan[]) 的结果，
+ * 前端展示时 JSON.parse 还原为 WeekPlan[]。
+ */
+export interface StudyPlanRecord {
+  id: number;
+  subjectId?: number;
+  weeks: number;
+  goal: string;
+  summary?: string;
+  planJson: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface StatsOverview {

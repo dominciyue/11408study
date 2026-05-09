@@ -89,11 +89,21 @@ public class ImportController {
             String content = p.get("content") != null ? String.valueOf(p.get("content")) : "";
             String difficulty = p.get("difficulty") != null ? String.valueOf(p.get("difficulty")) : null;
             List<Map<String, Object>> suggestedRelations = (List<Map<String, Object>>) p.get("suggested_relations");
+            // "PDF 出处定位"：透传 ai-service 返回的 source_excerpt；空字符串视为缺省。
+            Object excerptRaw = p.get("source_excerpt");
+            String sourceExcerpt = null;
+            if (excerptRaw != null) {
+                String s = String.valueOf(excerptRaw).trim();
+                if (!s.isEmpty()) {
+                    sourceExcerpt = s;
+                }
+            }
             return ImportKnowledgeExtractResponse.ExtractedKnowledgePointDTO.builder()
                     .title(title)
                     .content(content)
                     .difficulty(difficulty)
                     .suggestedRelations(suggestedRelations)
+                    .sourceExcerpt(sourceExcerpt)
                     .build();
         }).toList();
 

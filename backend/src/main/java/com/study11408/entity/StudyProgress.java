@@ -1,5 +1,6 @@
 package com.study11408.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,6 +23,9 @@ public class StudyProgress {
     @Column(name = "user_id", insertable = false, updatable = false)
     private Long userId;
 
+    // P1-bug fix: same Hibernate-proxy serialization issue as QuizQuestion.node.
+    // Frontend uses userId (Long) — no need to serialize the lazy User proxy.
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -29,6 +33,9 @@ public class StudyProgress {
     @Column(name = "node_id", insertable = false, updatable = false)
     private Long nodeId;
 
+    // Same fix on the other side: frontend uses nodeId; node→topic→subject lazy
+    // chain breaks Jackson serialization with "No serializer for ByteBuddyInterceptor".
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "node_id", nullable = false)
     private KnowledgeNode node;

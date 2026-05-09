@@ -29,6 +29,9 @@ class KnowledgePoint(BaseModel):
     content: str
     difficulty: Difficulty
     suggested_relations: Optional[list[RelationSuggestion]] = None
+    # source_excerpt：来自原文的 1-3 句直接引用（≤120 字），用于"出处定位"。
+    # LLM 不一定每次都返回；为兼容老回包默认设为 None。
+    source_excerpt: Optional[str] = Field(default=None, max_length=120)
 
 
 class ExtractionRequest(BaseModel):

@@ -56,7 +56,9 @@ class KnowledgeService:
             "- suggested_relations: 与其他概念的关系列表，每个关系包含：\n"
             "  - target_title: 相关知识点标题\n"
             "  - relation_type: 关系类型（PREREQUISITE / RELATED / EXTENDS / CROSS_SUBJECT）\n"
-            "  - confidence: 置信度（0.0 ~ 1.0）\n\n"
+            "  - confidence: 置信度（0.0 ~ 1.0）\n"
+            "- source_excerpt: 来自原文的 1-3 句直接引用（≤120 字），用于定位出处；"
+            "请使用原文中能体现该知识点的关键句，不要改写、不要总结；若原文不足以裁取，留空字符串\n\n"
             "请严格以JSON数组格式返回，不要包含其他文字。\n\n"
             f"--- 文本内容 ---\n{text}"
         )

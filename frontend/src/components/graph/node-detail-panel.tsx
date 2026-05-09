@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   BookOpen,
@@ -13,13 +13,27 @@ import {
   Star,
   Loader2,
   ListPlus,
+  FileText,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AiEnhanceDialog from "@/components/graph/ai-enhance-dialog";
-import { quizApi } from "@/lib/api";
+import { quizApi, studyApi } from "@/lib/api";
+
+/**
+ * "PDF 出处定位"：每条出处来自 ai-service 抽取阶段保留的原文片段。
+ * - excerpt：1-3 句直接引用（≤120 字）
+ * - materialId/pageNumber：可选；缺省时只显示 excerpt（兼容老数据）
+ */
+export interface NodeSource {
+  materialId?: number;
+  pageNumber?: number;
+  excerpt: string;
+}
 
 interface NodeDetailPanelProps {
   node: {
@@ -36,6 +50,11 @@ interface NodeDetailPanelProps {
     title: string;
     relationType: string;
   }>;
+  /**
+   * 当前知识点的"出处"列表（来源原文片段 + 资料/页码定位）。
+   * 父组件未实装真实数据接入时传 undefined / [] 不影响其他区块渲染。
+   */
+  sources?: NodeSource[];
   onClose: () => void;
   onNodeClick: (nodeId: string) => void;
 }
@@ -62,10 +81,24 @@ const difficultyLabels: Record<string, { label: string; color: string }> = {
   HARD: { label: "困难", color: "bg-red-500/20 text-red-400" },
 };
 
-export function NodeDetailPanel({ node, relatedNodes, onClose, onNodeClick }: NodeDetailPanelProps) {
+export function NodeDetailPanel({ node, relatedNodes, sources, onClose, onNodeClick }: NodeDetailPanelProps) {
   const [aiOpen, setAiOpen] = useState(false);
   const [genPending, setGenPending] = useState(false);
   const [genStatus, setGenStatus] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  // "出处"区默认折叠，避免占用首屏；用户主动展开
+  const [sourcesOpen, setSourcesOpen] = useState(false);
+  const hasSources = Array.isArray(sources) && sources.length > 0;
+
+  // Feature 4: 用户打开节点详情即视为"接触"，幂等创建 mastery=0 进度
+  // 后端 idempotent；忽略错误（无 token 或网络问题不应阻断浏览）
+  useEffect(() => {
+    if (!node) return;
+    const id = Number(node.id);
+    if (!Number.isFinite(id) || id <= 0) return;
+    studyApi.touchProgress(id).catch(() => {
+      /* silent */
+    });
+  }, [node?.id]);
 
   if (!node) return null;
 
@@ -143,6 +176,54 @@ export function NodeDetailPanel({ node, relatedNodes, onClose, onNodeClick }: No
               {node.content || "暂无内容"}
             </p>
           </div>
+
+          {/* 出处（PDF 出处定位） — 仅在 sources 非空时展示，可折叠 */}
+          {hasSources && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setSourcesOpen((v) => !v)}
+                className="w-full flex items-center justify-between text-sm font-medium text-gray-300 mb-2 hover:text-gray-100 transition-colors"
+                aria-expanded={sourcesOpen}
+              >
+                <span className="flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  出处 ({sources!.length})
+                </span>
+                {sourcesOpen ? (
+                  <ChevronDown className="w-4 h-4 text-gray-500" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-gray-500" />
+                )}
+              </button>
+              {sourcesOpen && (
+                <ul className="space-y-2">
+                  {sources!.map((s, idx) => (
+                    <li
+                      key={`${s.materialId ?? "m"}-${s.pageNumber ?? "p"}-${idx}`}
+                      className="rounded-lg bg-white/[0.03] border border-white/[0.04] p-3"
+                    >
+                      <div className="flex items-center gap-2 text-[11px] text-gray-500 mb-1">
+                        <FileText className="w-3 h-3" />
+                        {s.materialId !== undefined && (
+                          <span>资料 #{s.materialId}</span>
+                        )}
+                        {s.pageNumber !== undefined && (
+                          <span>· 第 {s.pageNumber} 页</span>
+                        )}
+                        {s.materialId === undefined && s.pageNumber === undefined && (
+                          <span>原文片段</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400 leading-relaxed whitespace-pre-wrap">
+                        “{s.excerpt}”
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           <Separator className="bg-white/[0.06]" />
 

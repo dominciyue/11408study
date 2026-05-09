@@ -1,9 +1,12 @@
 package com.study11408.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.study11408.dto.KnowledgeNodeDTO;
 import com.study11408.dto.StudyPlanRequest;
 import com.study11408.entity.KnowledgeEdge;
 import com.study11408.entity.KnowledgeNode;
+import com.study11408.entity.StudyPlan;
 import com.study11408.entity.StudyProgress;
 import com.study11408.entity.Subject;
 import com.study11408.entity.User;
@@ -33,6 +36,8 @@ public class StudyPathService {
     private final SubjectRepository subjectRepository;
     private final WrongAnswerRepository wrongAnswerRepository;
     private final AiClientService aiClientService;
+    private final StudyPlanRepository studyPlanRepository;
+    private final ObjectMapper objectMapper;
 
     public List<KnowledgeNodeDTO> generatePath(Long subjectId) {
         List<KnowledgeNode> nodes = nodeRepository.findByTopicSubjectId(subjectId);
@@ -124,6 +129,33 @@ public class StudyPathService {
     }
 
     /**
+     * 用户首次"接触"知识点时调用：若进度未存在，建一条 mastery=0 的初始记录；
+     * 若已存在则 no-op。让 dashboard "已学" 指标真实增长。
+     *
+     * <p>幂等：同一 (userId, nodeId) 多次调用只会创建一次。
+     */
+    @Transactional
+    public StudyProgress touchProgress(Long userId, Long nodeId) {
+        var existing = progressRepository.findByUserIdAndNodeId(userId, nodeId);
+        if (existing.isPresent()) {
+            return existing.get();
+        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("用户不存在", HttpStatus.NOT_FOUND));
+        KnowledgeNode node = nodeRepository.findById(nodeId)
+                .orElseThrow(() -> new BusinessException("知识节点不存在", HttpStatus.NOT_FOUND));
+        StudyProgress fresh = StudyProgress.builder()
+                .user(user)
+                .node(node)
+                .masteryLevel(0)
+                .repetitionCount(0)
+                .easeFactor(2.5)
+                .intervalDays(0)
+                .build();
+        return progressRepository.save(fresh);
+    }
+
+    /**
      * 生成 AI 学习计划：
      * <ol>
      *   <li>校验用户存在 + weeks 在 [1, 52]（controller 层 @Valid 兜底，
@@ -132,12 +164,17 @@ public class StudyPathService {
      *   <li>挑出薄弱主题 top 3-5（按错题节点出现频次 desc，
      *       fallback 到 mastery&lt;50 的节点）</li>
      *   <li>若 subjectId 给定，查 SubjectRepository 拿名字注入 prompt</li>
-     *   <li>调用 AiClientService.generateStudyPlan，返回原始 map</li>
+     *   <li>调用 AiClientService.generateStudyPlan</li>
+     *   <li><b>v2:</b> 若 ai-service 返回非 error 且 plan 数组非空，序列化整个
+     *       plan 数组到 plan_json，落库一条 StudyPlan，并把生成的 planId
+     *       注入返回 map，让前端跨设备取回完整计划。</li>
      * </ol>
      *
      * <p>非阻断式：subject/weakTopics 缺失时仍能产出通用计划，由 LLM 兜底。
+     * 持久化失败（JSON 序列化异常 / DB 异常）也不阻断生成 —— 只 log 警告，
+     * 返回 map 不带 planId 即视为本次未入库。
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public Map<String, Object> generateAiPlan(Long userId, StudyPlanRequest req) {
         if (req == null) {
             throw new BusinessException("请求体不能为空", HttpStatus.BAD_REQUEST);
@@ -178,13 +215,72 @@ public class StudyPathService {
                 studiedNodes,
                 totalNodes);
 
-        return aiClientService.generateStudyPlan(
+        Map<String, Object> aiResp = aiClientService.generateStudyPlan(
                 req.getGoal(),
                 req.getWeeks(),
                 subjectName,
                 weakTopics,
                 studiedNodes,
                 totalNodes);
+
+        // —— v2: 若生成成功就落库 + 注入 planId ——
+        // 用可变 wrapper 让我们能往里塞 planId（aiResp 可能是 Map.of(...) 不可变实现）。
+        Map<String, Object> result = new HashMap<>(aiResp != null ? aiResp : Map.of());
+        Object planObj = result.get("plan");
+        if (planObj instanceof List<?> planList && !planList.isEmpty() && !result.containsKey("error")) {
+            try {
+                String planJson = objectMapper.writeValueAsString(planList);
+                String summary = result.get("summary") instanceof String s ? s : null;
+                User userRef = userRepository.getReferenceById(userId);
+                StudyPlan saved = studyPlanRepository.save(StudyPlan.builder()
+                        .user(userRef)
+                        .subjectId(req.getSubjectId())
+                        .weeks(req.getWeeks())
+                        .goal(req.getGoal())
+                        .summary(summary)
+                        .planJson(planJson)
+                        .build());
+                result.put("planId", saved.getId());
+                log.info("AI 学习计划已入库 userId={} planId={} weeks={}",
+                        userId, saved.getId(), req.getWeeks());
+            } catch (JsonProcessingException e) {
+                log.warn("AI 学习计划序列化失败 userId={}: {}", userId, e.getMessage());
+            } catch (RuntimeException e) {
+                log.warn("AI 学习计划入库失败 userId={}: {}", userId, e.getMessage());
+            }
+        }
+
+        return result;
+    }
+
+    /** 列表：用户的所有保存的 AI 计划，最新在前。 */
+    @Transactional(readOnly = true)
+    public List<StudyPlan> listUserPlans(Long userId) {
+        return studyPlanRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    }
+
+    /**
+     * 详情：拿单份计划。带 ownership 校验，避免越权读其他用户的计划。
+     * @throws BusinessException(NOT_FOUND) 如果 planId 不存在或不属于 userId
+     */
+    @Transactional(readOnly = true)
+    public StudyPlan getUserPlan(Long userId, Long planId) {
+        return studyPlanRepository.findByIdAndUserId(planId, userId)
+                .orElseThrow(() -> new BusinessException(
+                        "学习计划不存在", HttpStatus.NOT_FOUND));
+    }
+
+    /**
+     * 删除：同样需 ownership 校验。
+     * @throws BusinessException(NOT_FOUND) 如果 planId 不存在或不属于 userId
+     */
+    @Transactional
+    public void deleteUserPlan(Long userId, Long planId) {
+        StudyPlan plan = studyPlanRepository.findByIdAndUserId(planId, userId)
+                .orElseThrow(() -> new BusinessException(
+                        "学习计划不存在", HttpStatus.NOT_FOUND));
+        studyPlanRepository.delete(plan);
+        log.info("AI 学习计划已删除 userId={} planId={}", userId, planId);
     }
 
     /**

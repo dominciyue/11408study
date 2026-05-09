@@ -5,6 +5,7 @@ import com.study11408.dto.KnowledgeNodeDTO;
 import com.study11408.dto.StartStudySessionRequest;
 import com.study11408.dto.StudyFeedbackRequest;
 import com.study11408.dto.StudyPlanRequest;
+import com.study11408.entity.StudyPlan;
 import com.study11408.entity.StudyProgress;
 import com.study11408.entity.StudySession;
 import com.study11408.security.JwtTokenProvider;
@@ -69,6 +70,15 @@ public class StudyController {
         return ApiResponse.ok(studyPathService.getNodeProgress(userId, nodeId));
     }
 
+    @Operation(summary = "首次接触某节点 → 创建 mastery=0 进度（幂等）")
+    @PostMapping("/progress/touch")
+    public ApiResponse<StudyProgress> touchProgress(
+            HttpServletRequest request,
+            @RequestParam Long nodeId) {
+        Long userId = getUserId(request);
+        return ApiResponse.ok(studyPathService.touchProgress(userId, nodeId));
+    }
+
     @Operation(summary = "开始学习会话")
     @PostMapping("/sessions")
     public ApiResponse<StudySession> startSession(
@@ -89,13 +99,40 @@ public class StudyController {
 
     @Operation(summary = "AI 生成分周学习计划",
             description = "根据用户目标 + 周数 + 薄弱主题，调用 ai-service "
-                    + "生成 N 周学习计划。返回原始 ai-service 响应（plan 数组 + summary）。")
+                    + "生成 N 周学习计划。返回原始 ai-service 响应（plan 数组 + summary "
+                    + "+ 入库后的 planId）。")
     @PostMapping("/ai-plan")
     public ApiResponse<Map<String, Object>> generateAiPlan(
             HttpServletRequest request,
             @Valid @RequestBody StudyPlanRequest body) {
         Long userId = getUserId(request);
         return ApiResponse.ok(studyPathService.generateAiPlan(userId, body));
+    }
+
+    @Operation(summary = "列出当前用户保存的所有 AI 周计划（最新在前）")
+    @GetMapping("/ai-plans")
+    public ApiResponse<List<StudyPlan>> listPlans(HttpServletRequest request) {
+        Long userId = getUserId(request);
+        return ApiResponse.ok(studyPathService.listUserPlans(userId));
+    }
+
+    @Operation(summary = "查询单份 AI 周计划详情")
+    @GetMapping("/ai-plans/{planId}")
+    public ApiResponse<StudyPlan> getPlan(
+            HttpServletRequest request,
+            @PathVariable Long planId) {
+        Long userId = getUserId(request);
+        return ApiResponse.ok(studyPathService.getUserPlan(userId, planId));
+    }
+
+    @Operation(summary = "删除当前用户的某份 AI 周计划")
+    @DeleteMapping("/ai-plans/{planId}")
+    public ApiResponse<Void> deletePlan(
+            HttpServletRequest request,
+            @PathVariable Long planId) {
+        Long userId = getUserId(request);
+        studyPathService.deleteUserPlan(userId, planId);
+        return ApiResponse.ok();
     }
 
     private Long getUserId(HttpServletRequest request) {

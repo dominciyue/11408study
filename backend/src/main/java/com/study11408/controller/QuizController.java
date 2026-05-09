@@ -60,6 +60,15 @@ public class QuizController {
         return ApiResponse.ok(quizService.getWrongAnswers(userId));
     }
 
+    @Operation(summary = "标记错题为已解决（幂等）")
+    @PutMapping("/wrong-answers/{wrongAnswerId}/resolve")
+    public ApiResponse<WrongAnswerDTO> resolveWrongAnswer(
+            HttpServletRequest request,
+            @PathVariable Long wrongAnswerId) {
+        Long userId = getUserId(request);
+        return ApiResponse.ok(quizService.markWrongAnswerResolved(userId, wrongAnswerId));
+    }
+
     @Operation(summary = "AI 启发式讲题")
     @PostMapping("/{questionId}/ai-explain")
     public ApiResponse<Map<String, Object>> aiExplain(
