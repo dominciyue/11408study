@@ -185,3 +185,89 @@ WeakKey 修了之后跑 IT，又发现：
 - **TDD + subagent 组合非常高效**：每个 P0 平均 30-90 分钟（含写测试 + e2e 验证），一晚上能完成 7 个 P0
 - **Pre-existing bug 暴露集中**：修第一个 P0 时把测试基础设施 unblock，连带暴露了 3 个 latent bug；好处是一次性都修了
 - **空间管理重要**：node_modules 600MB 默默吃掉空间，每个 docker build 留下 cache。建议每完成 2-3 个 fix 就 prune 一次
+
+---
+
+## 第二批：续会话（2026-05-09 16:00–？）
+
+### 上下文转交
+
+第一批结束后用户 push 了 24 commits + 重新进入会话。新增资源：DeepSeek API key + GitHub PAT。
+新指令：自行规划开发优化、参考竞品取长补短、优先本地、留痕、commit + push、空间敏感。
+
+### Phase A — DeepSeek 接入与冒烟（commit `bfb27e1` 包含此 phase 输出物之一）
+
+- `ai-service/.env` 新建（gitignored 已验证），写入 LLM_PROVIDER=openai + OPENAI_BASE_URL=https://api.deepseek.com/v1 + OPENAI_API_KEY + ALLOW_MISSING_LLM_KEY=false
+- `docker-compose.yml` ai-service block 加 `env_file: ./ai-service/.env`
+- 重启后启动日志显示 `[OK] LLM 配置校验通过 (provider=openai)`
+- 直连 DeepSeek + 经 ai-service `/ai/extract` + 经 nginx + 经 backend `/quiz/{id}/ai-explain` 全链路通
+
+### Phase B-1 — 竞品调研（subagent 并行）
+
+派 general-purpose subagent (`agent-ae5108a2aca7ec0de`) 完成：
+- 8 个平台覆盖：粉笔考研、知能行考研数学、考研帮、小猿 AI、StudyX、Quizlet、Anki/FSRS、多邻国/扇贝
+- 输出 `docs/research/competitive-analysis.md` (~1450 中文字)
+- Top 5 候选（按价值×成本排序）：AI 讲题闭环 / 能力等级量化 / PDF 出处定位 / 游戏化打卡 / 番茄钟周报
+
+### Phase B-2 — Provider 抽象（**降级跳过**）
+
+原计划做 LLMProvider 抽象基类，调研后判断 YAGNI：
+- 现有 `llm_service.py` 已通过 `llm_provider` 字段 + base_url 自动支持 DeepSeek/Moonshot 等 OpenAI-compat
+- DeepSeek E2E 已通，无新需求驱动抽象
+- 转而把这部分时间投入 Phase C 用户可见功能
+
+### Phase C — AI 启发式讲题（commit `bfb27e1`）
+
+落地 Top 候选 #1。三层完整链路：
+
+**ai-service**
+- 新 `/ai/explain-question` 端点 + `quiz_explain_service.py` + `quiz_explain.py` 路由
+- 启发式 SYSTEM_PROMPT：先肯定→指出选项问题→引导推理→鼓励追问
+- `LLMService.chat(messages, ...)` 新增以支持多轮 OpenAI-style messages，`generate()` 委托
+- 8 个 pytest（prompt 构造、首轮 vs 多轮分流、HTTP 200/400）
+
+**backend**
+- `POST /quiz/{id}/ai-explain`（auth 必需）
+- `AiClientService.explainQuestion(question, userAnswer, node, history)`
+- `QuizService.explainWithAi` 装配题目+选项+正确答案+知识点上下文
+- 7 个 Mockito 单测
+
+**frontend**
+- `AiExplainDialog` 复用 shadcn Dialog，自动首轮 + 多轮 textarea + Ctrl/Enter 发送
+- 集成到 `quiz/practice` 答题结果区与 `quiz/wrong` 错题列表
+- `quizApi.aiExplain`（90s timeout 兜住 LLM 调用）
+
+**E2E 真实 DeepSeek 调用：**
+- 单轮：`{userAnswer:"A"}` → 10s → 启发式回复（叠盘子/排队类比）
+- 多轮：history 含 3 条 → 10s → 详细栈应用场景（函数调用/Ctrl-Z/括号匹配/表达式求值）
+
+### 测试覆盖（截至本节）
+
+| 套件 | 数量 | 状态 |
+|---|---|---|
+| Backend Unit | **29** (+7) | ✅ ALL PASS |
+| Backend IT | 9 | ✅ ALL PASS |
+| AI Service pytest | **20** (+8) | ✅ ALL PASS |
+| **Total** | **58** (+15) | **100% green** |
+
+### Commit 清单（本批）
+
+| # | commit | 说明 |
+|---|---|---|
+| 1 | `bfb27e1` | **C-α** AI 启发式讲题 + 多轮追问（DeepSeek 真接入） |
+
+### 关键决策
+
+- 跳过 LLMProvider 抽象（YAGNI）— 现有结构已支持 DeepSeek
+- 选 #1 而非 #4（streak）— 更能展示 DeepSeek 价值
+- 多轮 history 由客户端管理，无服务端持久化（v1）— 简化数据库 schema
+- 用 Dialog 而非 Sheet（shadcn Sheet 未安装），max-w-2xl 容纳对话
+
+### 风险与缓解
+
+| 风险 | 表现 | 缓解 |
+|---|---|---|
+| LLM 调用慢 | 5-15s | 90s 客户端 timeout + loading spinner |
+| 多轮 history 在客户端易篡改 | 可能注入 prompt | 仅作 UX 提示，权威 prompt 由服务端构造 |
+| DeepSeek 限速 | 失败 | 已有 `_is_retryable` 区分 4xx 不重试，5xx 重试 3 次 |
+
