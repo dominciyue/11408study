@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   ReactFlow,
   Background,
@@ -17,7 +17,18 @@ import {
 import "@xyflow/react/dist/style.css";
 import { KnowledgeNode } from "@/components/graph/knowledge-node";
 import { NodeDetailPanel } from "@/components/graph/node-detail-panel";
-import { GraphToolbar } from "@/components/graph/graph-toolbar";
+import { GraphToolbar, type MasteryFilter } from "@/components/graph/graph-toolbar";
+
+function masteryToStarsLevel(m: number | undefined): number {
+  if (m == null || !Number.isFinite(m)) return 0;
+  const v = Math.max(0, Math.min(100, m));
+  if (v <= 0) return 0;
+  if (v <= 20) return 1;
+  if (v <= 40) return 2;
+  if (v <= 60) return 3;
+  if (v <= 80) return 4;
+  return 5;
+}
 
 const nodeTypes: NodeTypes = {
   knowledge: KnowledgeNode,
@@ -84,6 +95,25 @@ export default function GraphPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSubject, setActiveSubject] = useState<string | null>(null);
+  const [masteryFilter, setMasteryFilter] = useState<MasteryFilter>(null);
+
+  // 当 masteryFilter 变化时：把不匹配的节点 dimmed=true，匹配的 dimmed=false
+  // null = 显示全部；0 = 仅未学；1-5 = 仅匹配星级
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((n) => {
+        const m =
+          typeof n.data.mastery === "number" ? (n.data.mastery as number) : undefined;
+        const stars = masteryToStarsLevel(m);
+        const matches =
+          masteryFilter === null ? true : stars === masteryFilter;
+        return {
+          ...n,
+          data: { ...n.data, dimmed: !matches },
+        };
+      })
+    );
+  }, [masteryFilter, setNodes]);
 
   const selectedNode = useMemo(() => {
     if (!selectedNodeId) return null;
@@ -156,6 +186,8 @@ export default function GraphPage() {
           onSearchChange={setSearchQuery}
           activeSubject={activeSubject}
           onSubjectFilter={setActiveSubject}
+          masteryFilter={masteryFilter}
+          onMasteryFilter={setMasteryFilter}
           onZoomIn={() => {}}
           onZoomOut={() => {}}
           onFitView={() => {}}

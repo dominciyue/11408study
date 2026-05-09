@@ -555,5 +555,75 @@ WeakKey 修了之后跑 IT，又发现：
 - **Pomodoro partialize 不持久化 isRunning**：刷新后总停在暂停态，避免后台 tick 失真造成"重新打开是 25:00 但实际过了 1 小时"的诡异感
 - **Feature 9 subagent 并行**：与 backend mvn 编译墙钟时间复用
 
+---
+
+## 第七批：续会话（2026-05-09 17:55–？）
+
+### 目标
+继续候选清单两个高频痛点：
+1. **Feature 10 Quiz 题库批量种子**（候选 #3）— 题库目前仅 4 题，需要批量补充
+2. **Feature 11 图谱 mastery 过滤器**（候选 #5）— 完成 Feature 3+6 视觉闭环
+
+### Phase A — Feature 10（backend only，inline）
+
+**背景：** Feature 7 已能为单节点生成题；现在做"为整个学科批量"。
+- 防 LLM 雪崩：`maxNodes` 上限保护（默认 10，最大 50）— 一次最多处理这么多节点
+- `skipExisting=true` 默认：已有题的节点跳过（防重复）
+- 单节点失败不中断批次
+
+**文件：**
+- `QuizService.seedSubjectQuestions(subjectId, countPerNode, type, maxNodes, skipExisting)` 新方法
+- `POST /quiz/subjects/{subjectId}/seed-questions` 新端点
+- 9 个 Mockito 单测覆盖：
+  - 参数校验（countPerNode 0/21、maxNodes 0/51、type 非法 → BAD_REQUEST）
+  - 学科无节点 → totalNodes=0 安全返回
+  - maxNodes cap 生效（5 节点 maxNodes=2 → processed=2）
+  - skipExisting=true：已有题节点 skipped++
+  - skipExisting=false：所有节点都处理
+  - 单节点失败不中断批次（counter 准确）
+  - durationMs 字段存在且非负
+
+**返回结构：**
+```json
+{
+  "subjectId": 4, "totalNodes": 74, "processed": 10, "skipped": 5,
+  "succeeded": 8, "failed": 2, "totalQuestionsGenerated": 40, "durationMs": 95217
+}
+```
+
+### Phase B — Feature 11（frontend polish，inline）
+
+`graph-toolbar.tsx`：
+- 新 prop `masteryFilter: null | 0 | 1 | 2 | 3 | 4 | 5` + `onMasteryFilter` 回调
+- 工具栏加 `<select>`：全部 / 未学 / 1-5 星
+
+`graph/page.tsx`：
+- `masteryFilter` state + 同名 `masteryToStarsLevel` 工具函数（与 node-detail-panel 一致）
+- `useEffect` 在 filter 变化时把不匹配的节点 `dimmed=true`
+- `mastery=undefined / mastery=0` 算"未学"（filter=0 时显示）
+
+### 测试覆盖（截至本节）
+
+| 套件 | 数量 | 增量 |
+|---|---|---|
+| Backend Unit | 93 | +9 (QuizServiceSeedSubject) |
+| Backend IT | 9 | — |
+| AI Service pytest | 35 | — |
+| **Total** | **137** | **+9** |
+
+### Commit 清单（本批）
+
+| # | commit | 说明 |
+|---|---|---|
+| 1 | (待) | feat: Quiz 学科批量种子 + 图谱 mastery 过滤器 |
+
+### 关键决策
+
+- **maxNodes cap=50** 防止 admin 不小心调一次跑 1 小时（74 节点 × 10s = 12 min 已经够长，50 = 上限保护）
+- **不开放给所有用户随意调用**：当前用 Spring Security `.anyRequest().authenticated()` 兜底；任何登录用户都可以触发，因为这是"扩充共享题库"的良性行为；admin role 收紧留给 Phase 2 安全加固
+- **skipExisting 默认 true**：避免用户多次调用产生重复题；明确想覆盖请显式传 false
+- **mastery 过滤通过 dimmed 而非 hidden**：保留布局，让用户感知到"还有这些节点但被滤掉了"
+- **Feature 11 完全前端**：复用 nodeData.mastery（Feature 6 已传入），无后端改动
+
 
 

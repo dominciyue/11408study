@@ -8,16 +8,24 @@ import {
   ZoomOut,
   Maximize2,
   RotateCcw,
+  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+
+/**
+ * masteryFilter: null = 全部 | 0 = 未学（mastery<=0 / undefined） | 1-5 = 该星级
+ */
+export type MasteryFilter = null | 0 | 1 | 2 | 3 | 4 | 5;
 
 interface GraphToolbarProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   activeSubject: string | null;
   onSubjectFilter: (subject: string | null) => void;
+  masteryFilter?: MasteryFilter;
+  onMasteryFilter?: (filter: MasteryFilter) => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFitView: () => void;
@@ -33,11 +41,23 @@ const subjects = [
   { code: "cn", name: "计算机网络", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
 ];
 
+const MASTERY_OPTIONS: { value: MasteryFilter; label: string }[] = [
+  { value: null, label: "全部" },
+  { value: 0, label: "未学" },
+  { value: 1, label: "1 星" },
+  { value: 2, label: "2 星" },
+  { value: 3, label: "3 星" },
+  { value: 4, label: "4 星" },
+  { value: 5, label: "5 星" },
+];
+
 export function GraphToolbar({
   searchQuery,
   onSearchChange,
   activeSubject,
   onSubjectFilter,
+  masteryFilter = null,
+  onMasteryFilter,
   onZoomIn,
   onZoomOut,
   onFitView,
@@ -85,6 +105,28 @@ export function GraphToolbar({
             </Button>
           ))}
         </div>
+
+        {/* Mastery filter */}
+        {onMasteryFilter ? (
+          <div className="pointer-events-auto">
+            <select
+              value={masteryFilter === null ? "ALL" : String(masteryFilter)}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "ALL") onMasteryFilter(null);
+                else onMasteryFilter(Number(v) as MasteryFilter);
+              }}
+              className="rounded-md border border-white/[0.08] bg-[#111118]/90 backdrop-blur-md px-2.5 py-1.5 text-xs text-gray-300 outline-none focus:border-yellow-500/40 cursor-pointer"
+              title="按能力等级筛选；非匹配节点会被淡化"
+            >
+              {MASTERY_OPTIONS.map((o) => (
+                <option key={String(o.value)} value={o.value === null ? "ALL" : String(o.value)}>
+                  {o.value === null ? "★ 全部" : (o.value === 0 ? "○ 未学" : "★ " + o.label)}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
 
         <div className="flex-1" />
 

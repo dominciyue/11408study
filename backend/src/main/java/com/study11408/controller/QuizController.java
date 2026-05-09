@@ -83,6 +83,20 @@ public class QuizController {
         return ApiResponse.ok(quizService.generateAndSaveForNode(nodeId, count, type, difficulty));
     }
 
+    @Operation(summary = "为整个学科批量生成 AI 题目（admin 补题库）")
+    @PostMapping("/subjects/{subjectId}/seed-questions")
+    public ApiResponse<Map<String, Object>> seedSubject(
+            HttpServletRequest request,
+            @PathVariable Long subjectId,
+            @RequestParam(defaultValue = "5") int countPerNode,
+            @RequestParam(defaultValue = "CHOICE") String type,
+            @RequestParam(defaultValue = "10") int maxNodes,
+            @RequestParam(defaultValue = "true") boolean skipExisting) {
+        getUserId(request);
+        return ApiResponse.ok(quizService.seedSubjectQuestions(
+                subjectId, countPerNode, type, maxNodes, skipExisting));
+    }
+
     private Long getUserId(HttpServletRequest request) {
         String token = jwtTokenProvider.resolveToken(request);
         return jwtTokenProvider.getUserId(token);

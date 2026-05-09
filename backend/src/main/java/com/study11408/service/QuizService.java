@@ -146,6 +146,98 @@ public class QuizService {
     }
 
     /**
+     * 批量为某个学科下的节点生成题目（admin 用例：补全题库）。
+     * 循环调 {@link #generateAndSaveForNode}，每节点失败不中断整批。
+     *
+     * <p><b>限制：</b>maxNodes 上限保护防 LLM 雪崩。一次最多处理 maxNodes 个节点；
+     * 用户需要更多则多次调用。每节点 LLM ~10s，maxNodes=10 时一次约 100s。
+     *
+     * @param subjectId       目标学科
+     * @param countPerNode    每节点生成多少题（1-20）
+     * @param questionType    CHOICE / TRUE_FALSE / FILL_BLANK
+     * @param maxNodes        本次最多处理的节点数（1-50；上限保护）
+     * @param skipExisting    若节点已有任何题目则跳过；默认 true
+     * @return 处理摘要
+     */
+    public Map<String, Object> seedSubjectQuestions(
+            Long subjectId,
+            int countPerNode,
+            String questionType,
+            int maxNodes,
+            boolean skipExisting) {
+        if (countPerNode <= 0 || countPerNode > 20) {
+            throw new BusinessException(
+                    "countPerNode 必须在 1-20 之间", HttpStatus.BAD_REQUEST);
+        }
+        if (maxNodes <= 0 || maxNodes > 50) {
+            throw new BusinessException(
+                    "maxNodes 必须在 1-50 之间（防 LLM 雪崩）", HttpStatus.BAD_REQUEST);
+        }
+        String type = (questionType == null ? "CHOICE" : questionType.toUpperCase());
+        if (!ALLOWED_QUIZ_TYPES.contains(type)) {
+            throw new BusinessException(
+                    "questionType 必须是 CHOICE / TRUE_FALSE / FILL_BLANK",
+                    HttpStatus.BAD_REQUEST);
+        }
+
+        long startMs = System.currentTimeMillis();
+        List<KnowledgeNode> allNodes = nodeRepository.findByTopicSubjectId(subjectId);
+        if (allNodes.isEmpty()) {
+            return Map.of(
+                    "subjectId", subjectId,
+                    "totalNodes", 0,
+                    "processed", 0,
+                    "skipped", 0,
+                    "succeeded", 0,
+                    "failed", 0,
+                    "totalQuestionsGenerated", 0,
+                    "durationMs", 0L);
+        }
+
+        int processed = 0, skipped = 0, succeeded = 0, failed = 0, totalGenerated = 0;
+        for (KnowledgeNode node : allNodes) {
+            if (processed >= maxNodes) break;
+            if (skipExisting && !questionRepository.findByNodeId(node.getId()).isEmpty()) {
+                skipped++;
+                continue;
+            }
+            processed++;
+            try {
+                Map<String, Object> r = generateAndSaveForNode(
+                        node.getId(), countPerNode, type, null);
+                Object generatedObj = r.get("generated");
+                int generated = generatedObj instanceof Number
+                        ? ((Number) generatedObj).intValue() : 0;
+                if (generated > 0) {
+                    succeeded++;
+                    totalGenerated += generated;
+                } else {
+                    failed++;
+                }
+            } catch (Exception e) {
+                failed++;
+                log.warn("seedSubjectQuestions: 节点 {} 生成失败 (跳过)", node.getId(), e);
+            }
+        }
+
+        long duration = System.currentTimeMillis() - startMs;
+        log.info(
+                "seedSubjectQuestions subject={} processed={} skipped={} succeeded={} failed={} questions={} duration={}ms",
+                subjectId, processed, skipped, succeeded, failed, totalGenerated, duration);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("subjectId", subjectId);
+        result.put("totalNodes", allNodes.size());
+        result.put("processed", processed);
+        result.put("skipped", skipped);
+        result.put("succeeded", succeeded);
+        result.put("failed", failed);
+        result.put("totalQuestionsGenerated", totalGenerated);
+        result.put("durationMs", duration);
+        return result;
+    }
+
+    /**
      * 自适应组卷：按"应复习 → 低掌握 → 未学"三段优先级挑出节点，
      * 再随机抽 count 道题。无新表，仅用既有 study_progress + 题库。
      *
