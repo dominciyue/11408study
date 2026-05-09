@@ -46,7 +46,7 @@ public class StudyPathService {
         for (Long nodeId : nodeIds) {
             List<KnowledgeEdge> edges = edgeRepository.findBySourceId(nodeId);
             for (KnowledgeEdge edge : edges) {
-                if ("prerequisite".equals(edge.getRelationType()) && nodeIds.contains(edge.getTargetId())) {
+                if ("PREREQUISITE".equalsIgnoreCase(edge.getRelationType()) && nodeIds.contains(edge.getTargetId())) {
                     adjacency.get(nodeId).add(edge.getTargetId());
                     inDegree.merge(edge.getTargetId(), 1, Integer::sum);
                 }

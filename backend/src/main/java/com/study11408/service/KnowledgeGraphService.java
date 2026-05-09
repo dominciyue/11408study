@@ -100,7 +100,9 @@ public class KnowledgeGraphService {
         KnowledgeEdge edge = KnowledgeEdge.builder()
                 .source(source)
                 .target(target)
-                .relationType(request.getRelationType())
+                .relationType(request.getRelationType() != null
+                        ? request.getRelationType().toUpperCase()
+                        : null)
                 .weight(request.getWeight() != null ? request.getWeight() : 1.0)
                 .description(request.getDescription())
                 .build();
