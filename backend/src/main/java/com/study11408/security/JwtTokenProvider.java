@@ -27,11 +27,23 @@ public class JwtTokenProvider {
         this.refreshExpiration = refreshExpiration;
     }
 
+    /**
+     * @deprecated 该重载不写入 userId claim，会导致下游接口（如 NoteController/MaterialController
+     * 等通过 {@link #getUserId(String)}）拿不到用户 ID。新代码请用
+     * {@link #generateToken(String, Long)}。保留仅为兼容历史调用。
+     */
+    @Deprecated
     public String generateToken(Authentication authentication) {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         return generateToken(userDetails.getUsername());
     }
 
+    /**
+     * @deprecated 该重载不写入 userId claim，会导致下游接口（如 NoteController/MaterialController
+     * 等通过 {@link #getUserId(String)}）拿不到用户 ID。新代码请用
+     * {@link #generateToken(String, Long)}。保留仅为兼容历史调用。
+     */
+    @Deprecated
     public String generateToken(String username) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);

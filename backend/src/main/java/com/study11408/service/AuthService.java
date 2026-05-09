@@ -42,7 +42,7 @@ public class AuthService {
 
         user = userRepository.save(user);
 
-        String token = jwtTokenProvider.generateToken(user.getUsername());
+        String token = jwtTokenProvider.generateToken(user.getUsername(), user.getId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUsername());
 
         return AuthResponse.builder()
@@ -59,7 +59,7 @@ public class AuthService {
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new BusinessException("用户不存在", HttpStatus.NOT_FOUND));
 
-        String token = jwtTokenProvider.generateToken(authentication);
+        String token = jwtTokenProvider.generateToken(user.getUsername(), user.getId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUsername());
 
         return AuthResponse.builder()
@@ -78,7 +78,7 @@ public class AuthService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BusinessException("用户不存在", HttpStatus.NOT_FOUND));
 
-        String newToken = jwtTokenProvider.generateToken(username);
+        String newToken = jwtTokenProvider.generateToken(username, user.getId());
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(username);
 
         return AuthResponse.builder()
