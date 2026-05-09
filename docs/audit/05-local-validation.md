@@ -144,17 +144,18 @@ curl -sf --noproxy '*' http://localhost:18081/ai/health                 # AI 健
 
 ## 5. 已修 Blocker
 
-本审查严格遵守"只修阻塞本地跑通"的边界。共修 4 处，全部已 commit 并标注原因：
+本审查严格遵守"只修阻塞本地跑通"的边界。共修 5 处，全部已 commit 并标注原因：
 
 | # | 文件 | 改动 | commit | 必要性 |
 |---|---|---|---|---|
 | 1 | `docker-compose.yml` | backend 加 `ports: 8080:8080`、frontend 加 `ports: 3000:3000` | `67f1258` | 便于宿主 curl 直接验证（也利于本地开发） |
-| 2 | `backend/.mvn/settings.xml` + `backend/Dockerfile` | 注入 Aliyun Maven 镜像 + Dockerfile 用 `-s` 指向 settings | `1640fe2` | Maven Central 直连每依赖 0.3-1s，~300 deps 累计 5-15 分钟；改后 10 秒内 |
-| 3 | `ai-service/Dockerfile` | 用 Aliyun PyPI 镜像 | `0b1b4d7` | 直接 pip 装 fastapi 直接超时失败；改后 80 秒成功 |
-| 4 | `frontend/Dockerfile` | `node:18-alpine` → `node:20-alpine`（三处） | `1cfb913` | Next.js 16 要求 Node ≥20.9.0，原 18 直接 build error |
+| 2 | `backend/pom.xml` | `<properties>` 块加 `<lombok.version>1.18.32</lombok.version>` | `4c600a8` | maven-compiler-plugin 在 annotationProcessorPaths 中引用 `${lombok.version}` 但 properties 未定义，构建错 |
+| 3 | `backend/.mvn/settings.xml` + `backend/Dockerfile` | 注入 Aliyun Maven 镜像 + Dockerfile 用 `-s` 指向 settings | `1640fe2` | Maven Central 直连每依赖 0.3-1s，~300 deps 累计 5-15 分钟；改后 10 秒内 |
+| 4 | `ai-service/Dockerfile` | 用 Aliyun PyPI 镜像 | `0b1b4d7` | 直接 pip 装 fastapi 直接超时失败；改后 80 秒成功 |
+| 5 | `frontend/Dockerfile` | `node:18-alpine` → `node:20-alpine`（三处） | `1cfb913` | Next.js 16 要求 Node ≥20.9.0，原 18 直接 build error |
 
-**前 3 处都将作为 doc 2 路线图的"中国大陆构建环境标准化"任务条目。**
-**第 4 处是原代码的 regression**（前一作者忘了升级 Node 版本但升级了 Next.js），将作为 doc 1 的审查发现。
+**第 1、3、4 处**与国内/本地化环境相关，将作为 doc 2 路线图的"中国大陆构建环境标准化"任务条目。
+**第 2、5 处是原代码的 regression**（pom.xml 漏定义、Node 漏升级），将作为 doc 1 的审查发现。
 
 ---
 
