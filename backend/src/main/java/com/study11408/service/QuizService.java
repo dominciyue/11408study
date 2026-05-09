@@ -54,6 +54,97 @@ public class QuizService {
         return questions;
     }
 
+    private static final java.util.Set<String> ALLOWED_QUIZ_TYPES =
+            java.util.Set.of("CHOICE", "TRUE_FALSE", "FILL_BLANK");
+
+    /**
+     * 调用 ai-service /ai/generate-quiz 为指定节点生成 N 道题并落库。
+     * 用户调用前需通过 Spring Security auth；本方法本身不做用户权限收紧
+     * （任何登录用户都可以为公共节点生成题目，扩充题库）。
+     *
+     * <p>error 兼容：ai-service 返回 {error:...} 或非预期格式时，返回
+     * {generated:0, error:"..."}，不抛异常（前端友好提示）。
+     */
+    @Transactional
+    public Map<String, Object> generateAndSaveForNode(
+            Long nodeId, int count, String questionType, String difficulty) {
+        if (count <= 0) {
+            return Map.of("generated", 0, "error", "count 必须 > 0");
+        }
+        if (count > 20) count = 20;  // ai-service 上限即 20
+        String type = (questionType == null ? "CHOICE" : questionType.toUpperCase());
+        if (!ALLOWED_QUIZ_TYPES.contains(type)) {
+            return Map.of("generated", 0,
+                    "error", "questionType 必须是 CHOICE / TRUE_FALSE / FILL_BLANK");
+        }
+
+        KnowledgeNode node = nodeRepository.findById(nodeId)
+                .orElseThrow(() -> new BusinessException("知识节点不存在", HttpStatus.NOT_FOUND));
+        String title = node.getTitle();
+        String content = node.getContent() != null ? node.getContent() : "";
+
+        Map<String, Object> aiResp = aiClientService.generateQuiz(title, content, type, count, difficulty);
+        if (aiResp == null || aiResp.containsKey("error")) {
+            String err = aiResp == null ? "AI 无响应" : String.valueOf(aiResp.get("error"));
+            return Map.of("generated", 0, "error", err);
+        }
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> rawQuestions = (List<Map<String, Object>>) aiResp.get("questions");
+        if (rawQuestions == null || rawQuestions.isEmpty()) {
+            return Map.of("generated", 0, "error", "AI 未生成任何题目");
+        }
+
+        int saved = 0;
+        for (Map<String, Object> q : rawQuestions) {
+            try {
+                QuizQuestion entity = buildQuizEntity(node, type, q);
+                if (entity != null) {
+                    questionRepository.save(entity);
+                    saved++;
+                }
+            } catch (Exception e) {
+                log.warn("保存 AI 生成题目失败 (跳过): {}", q, e);
+            }
+        }
+
+        log.info("AI 为节点 {} ({}) 生成并保存 {} 道 {} 题", nodeId, title, saved, type);
+        return Map.of("generated", saved, "questionType", type, "nodeId", nodeId);
+    }
+
+    private QuizQuestion buildQuizEntity(KnowledgeNode node, String type, Map<String, Object> q) {
+        String contentStr = stringOrNull(q.get("question"));
+        String answer = stringOrNull(q.get("answer"));
+        String explanation = stringOrNull(q.get("explanation"));
+        if (contentStr == null || answer == null) {
+            return null;
+        }
+        Object opts = q.get("options");
+        String optsJson = null;
+        if (opts != null) {
+            try {
+                optsJson = objectMapper.writeValueAsString(opts);
+            } catch (Exception e) {
+                log.warn("序列化 options 失败: {}", opts, e);
+            }
+        }
+        return QuizQuestion.builder()
+                .node(node)
+                .questionType(type)
+                .content(contentStr)
+                .options(optsJson)
+                .answer(answer)
+                .explanation(explanation)
+                .source("ai-generated")
+                .build();
+    }
+
+    private static String stringOrNull(Object o) {
+        if (o == null) return null;
+        String s = String.valueOf(o).trim();
+        return s.isEmpty() ? null : s;
+    }
+
     /**
      * 自适应组卷：按"应复习 → 低掌握 → 未学"三段优先级挑出节点，
      * 再随机抽 count 道题。无新表，仅用既有 study_progress + 题库。

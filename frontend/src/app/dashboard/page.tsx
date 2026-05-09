@@ -17,9 +17,10 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useAuthStore } from "@/stores/auth-store";
 import { statsApi } from "@/lib/api";
-import type { StatsOverview } from "@/types";
+import type { StatsOverview, WeeklyReport } from "@/types";
 import { BadgesCard } from "@/components/dashboard/badges-card";
 import { DailyTasksCard } from "@/components/dashboard/daily-tasks-card";
+import { WeeklyReportCard } from "@/components/dashboard/weekly-report-card";
 import {
   ResponsiveContainer,
   BarChart,
@@ -41,15 +42,17 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user } = useAuthStore();
   const [overview, setOverview] = useState<StatsOverview | null>(null);
+  const [weeklyReport, setWeeklyReport] = useState<WeeklyReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
-    statsApi
-      .overview()
-      .then((res) => {
-        if (!cancelled) setOverview(res.data);
+    Promise.allSettled([statsApi.overview(), statsApi.weeklyReport()])
+      .then(([ov, wr]) => {
+        if (cancelled) return;
+        if (ov.status === "fulfilled") setOverview(ov.value.data);
+        if (wr.status === "fulfilled") setWeeklyReport(wr.value.data);
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -118,6 +121,9 @@ export default function DashboardPage() {
         <DailyTasksCard tasks={overview?.dailyTasks} />
         <BadgesCard badges={overview?.badges} />
       </div>
+
+      {/* 本周总结 (Feature 9) */}
+      <WeeklyReportCard report={weeklyReport ?? undefined} />
 
       {/* Subject progress cards */}
       <div>

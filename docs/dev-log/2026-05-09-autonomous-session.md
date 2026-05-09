@@ -490,5 +490,70 @@ WeakKey 修了之后跑 IT，又发现：
 | 12+ 周计划 token 数大、可能超时 | 客户端 timeout 120s；服务端 LLM 已有重试策略 |
 | 用户切设备丢计划 | 文档化 v1：localStorage 只本机；v2 可入库 |
 
+---
+
+## 第六批：续会话（2026-05-09 17:36–？）
+
+### 目标
+基于上批末尾候选清单，3 个新功能：
+1. **Feature 7 节点批量 AI 生题**（候选 #4）— 解决"题库只 1 道种子题"痛点
+2. **Feature 8 Pomodoro 持久化**（候选 #2 v2）— zustand persist middleware
+3. **Feature 9 周报卡片**（候选 #2）— dashboard 上加 7 天滚动总结（subagent 并行）
+
+### Phase A — Feature 8（前端 trivial inline）
+
+`pomodoro-store.ts` 包 `persist` middleware：
+- name: `study11408:pomodoro-v2`
+- partialize 只持久化 mode/secondsLeft/completedFocusCycles
+- isRunning 和 flashKey 不持久化（避免后台 tick 失真 + transient UI hint）
+
+### Phase B — Feature 7（backend + frontend，inline）
+
+**backend：**
+- 修复 `AiClientService.generateQuiz` 死签名：`(nodeId, type, count)` → `(title, content, type, count, difficulty)` 与 ai-service `/ai/generate-quiz` 契约对齐（之前少传 title/content，调用必失败 — 但确认无 caller，是死代码）
+- `QuizService.generateAndSaveForNode(nodeId, count, type, difficulty)` 新方法：
+  - white-list type ∈ {CHOICE, TRUE_FALSE, FILL_BLANK}
+  - count 上限 20（与 ai-service Pydantic Field le=20 对齐）
+  - 调 ai-service → 把 `question` 字段映到 entity `content`，options list → JSON 字符串
+  - 单条解析失败跳过不影响其他（防御式）
+  - error 兼容：返回 `{generated:0, error:"..."}` 不抛
+- `POST /quiz/nodes/{nodeId}/generate-questions?count=5&type=CHOICE&difficulty=`（auth 必需）
+- 10 个 Mockito 单测覆盖：count≤0 / 非法 type / 节点不存在 / ai 错误 / 空 questions / happy path 序列化 / TRUE_FALSE null options / 单条 malformed 跳过 / 大小写规整 / count cap 20
+
+**frontend：**
+- `quizApi.generateForNode(nodeId, {count, type, difficulty})` helper（120s timeout）
+- `node-detail-panel.tsx` 在 "AI 解读" 下方加绿色按钮 "AI 生成 5 道题入库"
+  - loading state（30-90s）+ inline 成功/失败提示
+
+### Phase C — Feature 9（subagent 并行）
+
+派 general-purpose subagent 实现：
+- backend：`WeeklyReportDTO` + `WeeklyReportService`（新 service，不污染 StatsService）+ `GET /stats/weekly-report` 端点
+- frontend：`WeeklyReportCard` 组件 + dashboard 集成 + `statsApi.weeklyReport` helper + `WeeklyReport` type
+- 5+ 单测
+
+### 测试覆盖（截至本节）
+
+| 套件 | 数量 | 增量 |
+|---|---|---|
+| Backend Unit | **76** (+10) | 10 QuizServiceGenerateForNode + (subagent 待加) |
+| Backend IT | 9 | — |
+| AI Service pytest | 35 | — |
+| **Total** | **120** | **+10** (待加 subagent 周报单测) |
+
+### Commit 清单（本批）
+
+| # | commit | 说明 |
+|---|---|---|
+| 1 | (待) | feat: 节点批量 AI 生题 + Pomodoro 持久化 + 周报卡片 |
+
+### 关键决策
+
+- **Feature 7 走 entity-level save**（非 DTO）— 直接持久化 QuizQuestion 实体；source="ai-generated" 用于后续追溯
+- **count cap 20 在 service 层**（与 ai-service Pydantic 校验对齐，避免 server-side validation 失败）
+- **死代码 `generateQuiz` 顺手修**（同 enhanceContent / explainQuestion 模式：旧签名永远 fail，无 caller）
+- **Pomodoro partialize 不持久化 isRunning**：刷新后总停在暂停态，避免后台 tick 失真造成"重新打开是 25:00 但实际过了 1 小时"的诡异感
+- **Feature 9 subagent 并行**：与 backend mvn 编译墙钟时间复用
+
 
 

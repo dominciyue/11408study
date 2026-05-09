@@ -207,6 +207,19 @@ export interface WeekPlan {
   review_focus?: string[];
 }
 
+export interface WeeklyReport {
+  weekStart: string; // ISO yyyy-MM-dd
+  weekEnd: string;
+  totalMinutes: number;
+  daysActive: number;
+  studiedNodesThisWeek: number;
+  reviewedNodesThisWeek: number;
+  dailyMinutes: number[]; // length 7, 0=earliest, 6=today
+  streakDays: number;
+  topWeakTopics: string[];
+  earnedBadges: number;
+}
+
 export interface StudyPlanResponse {
   plan: WeekPlan[];
   summary?: string;

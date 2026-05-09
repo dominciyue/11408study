@@ -11,12 +11,15 @@ import {
   ExternalLink,
   Sparkles,
   Star,
+  Loader2,
+  ListPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import AiEnhanceDialog from "@/components/graph/ai-enhance-dialog";
+import { quizApi } from "@/lib/api";
 
 interface NodeDetailPanelProps {
   node: {
@@ -61,6 +64,8 @@ const difficultyLabels: Record<string, { label: string; color: string }> = {
 
 export function NodeDetailPanel({ node, relatedNodes, onClose, onNodeClick }: NodeDetailPanelProps) {
   const [aiOpen, setAiOpen] = useState(false);
+  const [genPending, setGenPending] = useState(false);
+  const [genStatus, setGenStatus] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   if (!node) return null;
 
@@ -188,6 +193,61 @@ export function NodeDetailPanel({ node, relatedNodes, onClose, onNodeClick }: No
               AI 解读
             </Button>
           </div>
+
+          {aiEnabled ? (
+            <div className="space-y-2">
+              <Button
+                variant="outline"
+                className="w-full border-green-500/30 text-green-300 hover:bg-green-500/10 text-sm"
+                disabled={genPending}
+                onClick={async () => {
+                  setGenPending(true);
+                  setGenStatus(null);
+                  try {
+                    const res = await quizApi.generateForNode(numericNodeId, { count: 5 });
+                    const d = res.data || {};
+                    if (d.error) {
+                      setGenStatus({ kind: "err", text: d.error });
+                    } else {
+                      setGenStatus({
+                        kind: "ok",
+                        text: `已为本节点生成 ${d.generated ?? 0} 道 ${d.questionType ?? "CHOICE"} 题`,
+                      });
+                    }
+                  } catch (err: unknown) {
+                    const msg = err instanceof Error ? err.message : "AI 调用失败";
+                    setGenStatus({ kind: "err", text: msg });
+                  } finally {
+                    setGenPending(false);
+                  }
+                }}
+                title="调用 DeepSeek 为本节点生成 5 道选择题并入库"
+              >
+                {genPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                    生成中（30-90s）...
+                  </>
+                ) : (
+                  <>
+                    <ListPlus className="w-4 h-4 mr-1.5" />
+                    AI 生成 5 道题入库
+                  </>
+                )}
+              </Button>
+              {genStatus ? (
+                <p
+                  className={
+                    genStatus.kind === "ok"
+                      ? "text-xs text-green-400 text-center"
+                      : "text-xs text-red-400 text-center"
+                  }
+                >
+                  {genStatus.text}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </ScrollArea>
 

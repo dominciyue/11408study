@@ -2,8 +2,10 @@ package com.study11408.controller;
 
 import com.study11408.dto.ApiResponse;
 import com.study11408.dto.StatsOverviewDTO;
+import com.study11408.dto.WeeklyReportDTO;
 import com.study11408.security.JwtTokenProvider;
 import com.study11408.service.StatsService;
+import com.study11408.service.WeeklyReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +24,7 @@ import java.util.Map;
 public class StatsController {
 
     private final StatsService statsService;
+    private final WeeklyReportService weeklyReportService;
     private final JwtTokenProvider jwtTokenProvider;
 
     @Operation(summary = "学习概览统计")
@@ -43,6 +46,13 @@ public class StatsController {
     public ApiResponse<Map<String, Object>> getWeakness(HttpServletRequest request) {
         Long userId = getUserId(request);
         return ApiResponse.ok(statsService.getWeaknessAnalysis(userId));
+    }
+
+    @Operation(summary = "本周学习周报")
+    @GetMapping("/weekly-report")
+    public ApiResponse<WeeklyReportDTO> weeklyReport(HttpServletRequest request) {
+        Long userId = getUserId(request);
+        return ApiResponse.ok(weeklyReportService.build(userId));
     }
 
     private Long getUserId(HttpServletRequest request) {

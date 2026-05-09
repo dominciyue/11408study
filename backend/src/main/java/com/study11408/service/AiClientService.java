@@ -68,12 +68,21 @@ public class AiClientService {
     }
 
     @SuppressWarnings("unchecked")
-    public Map<String, Object> generateQuiz(Long nodeId, String questionType, int count) {
+    public Map<String, Object> generateQuiz(
+            String knowledgeTitle,
+            String knowledgeContent,
+            String questionType,
+            int count,
+            String difficulty) {
         try {
             Map<String, Object> request = new HashMap<>();
-            request.put("node_id", nodeId);
+            request.put("knowledge_title", knowledgeTitle);
+            request.put("knowledge_content", knowledgeContent);
             request.put("question_type", questionType);
             request.put("count", count);
+            if (difficulty != null && !difficulty.isBlank()) {
+                request.put("difficulty", difficulty);
+            }
 
             ResponseEntity<Map> response = restTemplate.postForEntity(
                     aiServiceUrl + "/ai/generate-quiz", request, Map.class);

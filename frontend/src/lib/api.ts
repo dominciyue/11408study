@@ -18,6 +18,7 @@ import type {
   StudyFeedback,
   QuizSubmission,
   StatsOverview,
+  WeeklyReport,
   User,
 } from "@/types";
 import { getToken, clearAuth } from "@/lib/auth";
@@ -59,6 +60,10 @@ export const authApi = {
     api.post<unknown, ApiResponse<AuthResponse>>("/auth/refresh", { refreshToken }),
   me: () => api.get<unknown, ApiResponse<User>>("/auth/me"),
 };
+
+// ─── Stats ───────────────────────────────────────────────────────────────────
+// (statsApi defined further below; this re-export adds /weekly-report support
+// while staying near the related types.)
 
 // ─── Subjects ────────────────────────────────────────────────────────────────
 export const subjectsApi = {
@@ -150,6 +155,25 @@ export const quizApi = {
       body,
       { timeout: 90000 } // LLM 调用 5-30s 不等，避免被默认 15s 超时截掉
     ),
+  generateForNode: (
+    nodeId: number,
+    opts?: { count?: number; type?: "CHOICE" | "TRUE_FALSE" | "FILL_BLANK"; difficulty?: string }
+  ) =>
+    api.post<
+      unknown,
+      ApiResponse<{ generated?: number; questionType?: string; nodeId?: number; error?: string }>
+    >(
+      `/quiz/nodes/${nodeId}/generate-questions`,
+      null,
+      {
+        params: {
+          count: opts?.count ?? 5,
+          type: opts?.type ?? "CHOICE",
+          ...(opts?.difficulty ? { difficulty: opts.difficulty } : {}),
+        },
+        timeout: 120000, // LLM 批量生题可能 30-90s
+      }
+    ),
 };
 
 // ─── Materials ───────────────────────────────────────────────────────────────
@@ -186,6 +210,8 @@ export const statsApi = {
     api.get<unknown, ApiResponse<Array<{ date: string; sessions: number; studiedNodes: number; reviewedNodes: number; studyMinutes: number }>>>(
       "/stats/daily"
     ),
+  weeklyReport: () =>
+    api.get<unknown, ApiResponse<WeeklyReport>>("/stats/weekly-report"),
   weakness: () =>
     api.get<unknown, ApiResponse<{ topWrongNodes: Array<{ nodeId: number; wrongCount: number; nodeTitle?: string; topicName?: string }>; lowMasteryNodes: Array<{ nodeId: number; masteryLevel: number; nodeTitle?: string }> }>>(
       "/stats/weakness"

@@ -70,6 +70,19 @@ public class QuizController {
         return ApiResponse.ok(quizService.explainWithAi(userId, questionId, body));
     }
 
+    @Operation(summary = "为节点批量生成 AI 题目并落库")
+    @PostMapping("/nodes/{nodeId}/generate-questions")
+    public ApiResponse<Map<String, Object>> generateForNode(
+            HttpServletRequest request,
+            @PathVariable Long nodeId,
+            @RequestParam(defaultValue = "5") int count,
+            @RequestParam(defaultValue = "CHOICE") String type,
+            @RequestParam(required = false) String difficulty) {
+        // auth 由 Spring Security 兜底
+        getUserId(request);
+        return ApiResponse.ok(quizService.generateAndSaveForNode(nodeId, count, type, difficulty));
+    }
+
     private Long getUserId(HttpServletRequest request) {
         String token = jwtTokenProvider.resolveToken(request);
         return jwtTokenProvider.getUserId(token);
