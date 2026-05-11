@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ReactFlow,
   Background,
@@ -173,6 +173,7 @@ function toXyflowEdge(e: KnowledgeEdgeType): Edge {
 }
 
 function GraphPageInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const subjectIdParam = searchParams.get("subjectId");
   const topicIdParam = searchParams.get("topicId");
@@ -183,6 +184,13 @@ function GraphPageInner() {
   const focusNodeId = focusNodeIdParam ? Number(focusNodeIdParam) : null;
 
   const hasValidSubject = Number.isFinite(subjectId) && subjectId > 0;
+
+  // 缺 subjectId 时不要弹错，直接引导回 /subjects 选学科入口。
+  useEffect(() => {
+    if (!hasValidSubject) {
+      router.replace("/subjects");
+    }
+  }, [hasValidSubject, router]);
   const hasValidTopic =
     topicId !== null && Number.isFinite(topicId) && topicId > 0;
   const hasValidFocus =

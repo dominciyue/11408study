@@ -264,10 +264,15 @@ export function NodeDetailPanel({ node, relatedNodes, sources, onClose, onNodeCl
             <Button
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm"
               onClick={() => {
-                // practice 页当前以 subjectId 为入口（默认 408）；
-                // 节点级精准 nodeIds 路由暂未实装，降级到学科练习模式。
-                router.push("/quiz/practice?subjectId=4");
+                // practice 页 ?nodeId=N 模式：只拉本节点关联题（V2/V8/V9/V10 真题种子）。
+                // 节点 id 异常时回退到学科练习。
+                if (aiEnabled) {
+                  router.push(`/quiz/practice?nodeId=${numericNodeId}`);
+                } else {
+                  router.push("/quiz/practice?subjectId=4");
+                }
               }}
+              title={aiEnabled ? "做本知识点的题" : "节点 id 无效，进入 408 学科练习"}
             >
               <BookOpen className="w-4 h-4 mr-2" />
               开始学习

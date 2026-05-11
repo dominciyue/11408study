@@ -43,8 +43,14 @@ function QuizPracticeInner() {
   const timedFlag = searchParams.get("timed") === "1";
   const rawSubjectId = searchParams.get("subjectId");
   const subjectId = rawSubjectId ? Number(rawSubjectId) : undefined;
-  // 缺省 subjectId 也走 adaptive
-  const useAdaptive = adaptiveFlag || subjectId == null;
+  const rawNodeId = searchParams.get("nodeId");
+  const nodeId =
+    rawNodeId && Number.isFinite(Number(rawNodeId)) && Number(rawNodeId) > 0
+      ? Number(rawNodeId)
+      : undefined;
+  // 优先级：nodeId > subjectId（自适应/学科）。nodeId 模式直接拉本节点的题，
+  // 不走自适应（自适应是跨节点推题，与"在该节点学习"语义冲突）。
+  const useAdaptive = !nodeId && (adaptiveFlag || subjectId == null);
 
   type SubmitResult = { correct: boolean; correctAnswer: string; explanation?: string };
 
@@ -78,22 +84,32 @@ function QuizPracticeInner() {
       setSelected(null);
       try {
         let questionsData: QuizQuestion[] = [];
-        try {
-          if (useAdaptive) {
-            const adaptiveRes = await quizApi.adaptiveGenerate(undefined, 10);
-            questionsData = adaptiveRes.data || [];
-          } else {
-            const adaptiveRes = await quizApi.adaptiveGenerate(subjectId, 10);
-            questionsData = adaptiveRes.data || [];
+        // 单节点模式：只拉该节点的题（来自 V2/V8/V9/V10 真题种子或既往 AI 生题）
+        if (nodeId) {
+          try {
+            const quizRes = await quizApi.generate([nodeId], 10);
+            questionsData = quizRes.data || [];
+          } catch (_err) {
+            // 静默降级
           }
-        } catch (_err) {
-          // 静默降级
-        }
-        if (questionsData.length === 0 && subjectId != null) {
-          const nodesRes = await knowledgeApi.getNodes({ subjectId });
-          const nodeIds = nodesRes.data.slice(0, 20).map((n: KnowledgeNode) => n.id);
-          const quizRes = await quizApi.generate(nodeIds, 10);
-          questionsData = quizRes.data;
+        } else {
+          try {
+            if (useAdaptive) {
+              const adaptiveRes = await quizApi.adaptiveGenerate(undefined, 10);
+              questionsData = adaptiveRes.data || [];
+            } else {
+              const adaptiveRes = await quizApi.adaptiveGenerate(subjectId, 10);
+              questionsData = adaptiveRes.data || [];
+            }
+          } catch (_err) {
+            // 静默降级
+          }
+          if (questionsData.length === 0 && subjectId != null) {
+            const nodesRes = await knowledgeApi.getNodes({ subjectId });
+            const nodeIds = nodesRes.data.slice(0, 20).map((n: KnowledgeNode) => n.id);
+            const quizRes = await quizApi.generate(nodeIds, 10);
+            questionsData = quizRes.data;
+          }
         }
         if (!cancelled) {
           setQuestions(questionsData);
@@ -107,7 +123,7 @@ function QuizPracticeInner() {
     return () => {
       cancelled = true;
     };
-  }, [subjectId, useAdaptive]);
+  }, [subjectId, useAdaptive, nodeId]);
 
   // 提交（手动 / 自动），auto=true 时未选当作错（提交一个占位串）
   const submit = useCallback(
@@ -157,12 +173,13 @@ function QuizPracticeInner() {
   }, [timedFlag, q, result, submit, idx]);
 
   const headerBadge = useMemo(() => {
+    if (nodeId) return { text: "单节点练习", cls: "bg-emerald-500/20 text-emerald-300" };
     if (adaptiveFlag) return { text: "自适应", cls: "bg-purple-500/20 text-purple-300" };
     if (timedFlag) return { text: "限时模拟", cls: "bg-red-500/20 text-red-300" };
     if (subjectId != null && SUBJECT_NAMES[subjectId])
       return { text: SUBJECT_NAMES[subjectId], cls: "bg-blue-500/20 text-blue-300" };
     return { text: "自适应", cls: "bg-purple-500/20 text-purple-300" };
-  }, [adaptiveFlag, timedFlag, subjectId]);
+  }, [adaptiveFlag, timedFlag, subjectId, nodeId]);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">

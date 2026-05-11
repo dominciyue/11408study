@@ -10,6 +10,7 @@ import {
   ClipboardCheck,
   FolderOpen,
   StickyNote,
+  Library,
   ChevronLeft,
   ChevronDown,
   ChevronRight,
@@ -41,6 +42,7 @@ const bottomNavItems = [
   { name: "测验", href: "/quiz", icon: ClipboardCheck },
   { name: "资料库", href: "/materials", icon: FolderOpen },
   { name: "笔记", href: "/notes", icon: StickyNote },
+  { name: "学习资源", href: "/resources", icon: Library },
 ];
 
 export function Sidebar() {
@@ -55,7 +57,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "flex flex-col h-screen bg-[#0a0a0f] border-r border-white/[0.06] transition-all duration-300 shrink-0",
+        "flex flex-col h-screen bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-all duration-300 shrink-0",
         collapsed ? "w-[68px]" : "w-[260px]"
       )}
     >
@@ -65,13 +67,13 @@ export function Sidebar() {
           <GraduationCap className="w-5 h-5 text-white" />
         </div>
         {!collapsed && (
-          <span className="text-base font-bold text-white whitespace-nowrap">
+          <span className="text-base font-bold text-foreground whitespace-nowrap">
             11408 学习平台
           </span>
         )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="ml-auto p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors cursor-pointer"
+          className="ml-auto p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors cursor-pointer"
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
@@ -88,8 +90,8 @@ export function Sidebar() {
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
               isActive(item.href)
-                ? "bg-blue-600/15 text-blue-400"
-                : "text-gray-400 hover:text-gray-200 hover:bg-white/5"
+                ? "bg-blue-600/15 text-blue-500 dark:text-blue-400"
+                : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
             )}
           >
             <item.icon className="w-5 h-5 shrink-0" />
@@ -102,7 +104,7 @@ export function Sidebar() {
           <button
             onClick={() => setSubjectsOpen(!subjectsOpen)}
             className={cn(
-              "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-all duration-200 cursor-pointer",
+              "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-all duration-200 cursor-pointer",
               collapsed && "justify-center"
             )}
           >
@@ -120,7 +122,7 @@ export function Sidebar() {
             )}
           </button>
           {subjectsOpen && !collapsed && (
-            <div className="ml-4 mt-1 space-y-0.5 border-l border-white/[0.06] pl-3">
+            <div className="ml-4 mt-1 space-y-0.5 border-l border-sidebar-border pl-3">
               {subjectItems.map((item) => (
                 <Link
                   key={item.href}
@@ -128,8 +130,8 @@ export function Sidebar() {
                   className={cn(
                     "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
                     isActive(item.href)
-                      ? `${item.textColor} bg-white/5`
-                      : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+                      ? `${item.textColor} bg-foreground/5`
+                      : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
                   )}
                 >
                   <div className={cn("w-2 h-2 rounded-full shrink-0", item.color)} />
@@ -149,8 +151,8 @@ export function Sidebar() {
             className={cn(
               "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
               isActive(item.href)
-                ? "bg-blue-600/15 text-blue-400"
-                : "text-gray-400 hover:text-gray-200 hover:bg-white/5"
+                ? "bg-blue-600/15 text-blue-500 dark:text-blue-400"
+                : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
             )}
           >
             <item.icon className="w-5 h-5 shrink-0" />
@@ -176,20 +178,20 @@ export function Sidebar() {
           </Avatar>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-200 truncate">
+              <p className="text-sm font-medium text-foreground truncate">
                 {user?.nickname || user?.username || "用户"}
               </p>
-              <p className="text-xs text-gray-500 truncate">{user?.email || ""}</p>
+              <p className="text-xs text-muted-foreground truncate">{user?.email || ""}</p>
             </div>
           )}
           {!collapsed && (
             <div className="flex items-center gap-1">
-              <button className="p-1.5 rounded-md text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors cursor-pointer">
+              <button className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors cursor-pointer">
                 <Settings className="w-4 h-4" />
               </button>
               <button
                 onClick={logout}
-                className="p-1.5 rounded-md text-gray-500 hover:text-red-400 hover:bg-white/5 transition-colors cursor-pointer"
+                className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 dark:hover:text-red-400 hover:bg-foreground/5 transition-colors cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
               </button>
