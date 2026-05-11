@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -82,6 +83,7 @@ const difficultyLabels: Record<string, { label: string; color: string }> = {
 };
 
 export function NodeDetailPanel({ node, relatedNodes, sources, onClose, onNodeClick }: NodeDetailPanelProps) {
+  const router = useRouter();
   const [aiOpen, setAiOpen] = useState(false);
   const [genPending, setGenPending] = useState(false);
   const [genStatus, setGenStatus] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
@@ -259,7 +261,14 @@ export function NodeDetailPanel({ node, relatedNodes, sources, onClose, onNodeCl
 
           {/* Actions */}
           <div className="flex gap-2 pt-2">
-            <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm">
+            <Button
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm"
+              onClick={() => {
+                // practice 页当前以 subjectId 为入口（默认 408）；
+                // 节点级精准 nodeIds 路由暂未实装，降级到学科练习模式。
+                router.push("/quiz/practice?subjectId=4");
+              }}
+            >
               <BookOpen className="w-4 h-4 mr-2" />
               开始学习
             </Button>

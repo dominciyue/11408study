@@ -176,13 +176,17 @@ function GraphPageInner() {
   const searchParams = useSearchParams();
   const subjectIdParam = searchParams.get("subjectId");
   const topicIdParam = searchParams.get("topicId");
+  const focusNodeIdParam = searchParams.get("focusNodeId");
 
   const subjectId = Number(subjectIdParam);
   const topicId = topicIdParam ? Number(topicIdParam) : null;
+  const focusNodeId = focusNodeIdParam ? Number(focusNodeIdParam) : null;
 
   const hasValidSubject = Number.isFinite(subjectId) && subjectId > 0;
   const hasValidTopic =
     topicId !== null && Number.isFinite(topicId) && topicId > 0;
+  const hasValidFocus =
+    focusNodeId !== null && Number.isFinite(focusNodeId) && focusNodeId > 0;
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -247,6 +251,27 @@ function GraphPageInner() {
     setNodes(xyNodes);
     setEdges(xyEdges);
   }, [rawNodes, rawEdges, setNodes, setEdges]);
+
+  // 来自 URL 的 focusNodeId：数据布局完成后自动选中并居中（仅一次）
+  useEffect(() => {
+    if (!hasValidFocus || nodes.length === 0) return;
+    const targetId = String(focusNodeId);
+    const target = nodes.find((n) => n.id === targetId);
+    if (!target) return;
+    setSelectedNodeId(targetId);
+    setNodes((nds) =>
+      nds.map((n) => ({
+        ...n,
+        data: { ...n.data, selected: n.id === targetId, dimmed: false },
+      })),
+    );
+    // dagre 算出的是节点左上角，setCenter 需要中心点
+    const cx = target.position.x + NODE_WIDTH / 2;
+    const cy = target.position.y + NODE_HEIGHT / 2;
+    reactFlow.setCenter(cx, cy, { zoom: 1.5, duration: 600 });
+    // 一次性副作用：仅在 focusNodeId 或节点数变化时触发
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusNodeId, nodes.length]);
 
   // masteryFilter + topicId 联合作用：不匹配的 dimmed
   useEffect(() => {

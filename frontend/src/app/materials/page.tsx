@@ -29,19 +29,40 @@ const typeIcon: Record<string, React.ElementType> = {
   "链接": Link2,
 };
 
+const SUBJECT_OPTIONS: Array<{ id: number | null; label: string }> = [
+  { id: null, label: "全部" },
+  { id: 1, label: "政治" },
+  { id: 2, label: "英一" },
+  { id: 3, label: "数一" },
+  { id: 4, label: "408" },
+];
+
+const TYPE_OPTIONS: Array<{ value: string | null; label: string }> = [
+  { value: null, label: "全部" },
+  { value: "PDF", label: "PDF" },
+  { value: "IMAGE", label: "图片" },
+  { value: "NOTE", label: "笔记" },
+];
+
 export default function MaterialsPage() {
   const router = useRouter();
   const [dragActive, setDragActive] = useState(false);
   const [items, setItems] = useState<Material[]>([]);
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [subjectId, setSubjectId] = useState<number | null>(null);
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [showFilter, setShowFilter] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
+    const params: { subjectId?: number; type?: string } = {};
+    if (subjectId !== null) params.subjectId = subjectId;
+    if (typeFilter !== null) params.type = typeFilter;
     materialsApi
-      .list()
+      .list(Object.keys(params).length ? params : undefined)
       .then((res) => {
         if (!cancelled) setItems(res.data);
       })
@@ -51,7 +72,7 @@ export default function MaterialsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [subjectId, typeFilter]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -121,20 +142,84 @@ export default function MaterialsPage() {
       </Card>
 
       {/* Search and filter */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-          <Input
-            placeholder="搜索资料..."
-            className="pl-9 bg-white/5 border-white/[0.08]"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+      <div className="space-y-3">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+            <Input
+              placeholder="搜索资料..."
+              className="pl-9 bg-white/5 border-white/[0.08]"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          <Button
+            variant="outline"
+            className={`border-white/[0.08] ${
+              showFilter || subjectId !== null || typeFilter !== null
+                ? "text-blue-400 bg-blue-500/10"
+                : "text-gray-400"
+            }`}
+            onClick={() => setShowFilter((v) => !v)}
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            筛选
+            {(subjectId !== null || typeFilter !== null) && (
+              <span className="ml-2 inline-flex items-center justify-center w-4 h-4 text-[10px] rounded-full bg-blue-500 text-white">
+                {(subjectId !== null ? 1 : 0) + (typeFilter !== null ? 1 : 0)}
+              </span>
+            )}
+          </Button>
         </div>
-        <Button variant="outline" className="border-white/[0.08] text-gray-400">
-          <Filter className="w-4 h-4 mr-2" />
-          筛选
-        </Button>
+
+        {showFilter && (
+          <Card className="border-white/[0.06] bg-white/[0.02]">
+            <CardContent className="p-4 space-y-3">
+              <div>
+                <p className="text-xs text-gray-500 mb-2">学科</p>
+                <div className="flex flex-wrap gap-2">
+                  {SUBJECT_OPTIONS.map((opt) => {
+                    const active = subjectId === opt.id;
+                    return (
+                      <button
+                        key={`s-${opt.id ?? "all"}`}
+                        onClick={() => setSubjectId(opt.id)}
+                        className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+                          active
+                            ? "bg-blue-500/20 border-blue-500/40 text-blue-300"
+                            : "bg-white/5 border-white/[0.08] text-gray-400 hover:text-gray-200"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-2">类型</p>
+                <div className="flex flex-wrap gap-2">
+                  {TYPE_OPTIONS.map((opt) => {
+                    const active = typeFilter === opt.value;
+                    return (
+                      <button
+                        key={`t-${opt.value ?? "all"}`}
+                        onClick={() => setTypeFilter(opt.value)}
+                        className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+                          active
+                            ? "bg-purple-500/20 border-purple-500/40 text-purple-300"
+                            : "bg-white/5 border-white/[0.08] text-gray-400 hover:text-gray-200"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Materials list */}
@@ -145,7 +230,28 @@ export default function MaterialsPage() {
           </Card>
         ) : filtered.length === 0 ? (
           <Card className="border-white/[0.06]">
-            <CardContent className="p-4 text-gray-500">暂无资料。</CardContent>
+            <CardContent className="p-10 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-blue-500/10 flex items-center justify-center">
+                <FolderOpen className="w-8 h-8 text-blue-400" />
+              </div>
+              <p className="text-gray-300 font-medium mb-1">
+                {(subjectId !== null || typeFilter !== null || query)
+                  ? "没有符合条件的资料"
+                  : "暂无资料"}
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                {(subjectId !== null || typeFilter !== null || query)
+                  ? "尝试清除筛选或换个关键词"
+                  : "点击右上角\"添加资料\"或拖拽文件到上方区域开始"}
+              </p>
+              <Button
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                立即上传
+              </Button>
+            </CardContent>
           </Card>
         ) : (
           filtered.map((material) => {
@@ -166,7 +272,19 @@ export default function MaterialsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="sm" className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0"
+                    title="查看"
+                    onClick={() => {
+                      if (material.fileUrl) {
+                        window.open(material.fileUrl, "_blank");
+                      } else {
+                        alert("该资料尚未上传文件");
+                      }
+                    }}
+                  >
                     <Eye className="w-4 h-4" />
                   </Button>
                   <Button

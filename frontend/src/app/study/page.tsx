@@ -15,7 +15,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { statsApi, studyApi } from "@/lib/api";
+import { knowledgeApi, statsApi, studyApi } from "@/lib/api";
 
 function minutesToHoursText(minutes: number) {
   if (!Number.isFinite(minutes)) return "0h";
@@ -24,18 +24,43 @@ function minutesToHoursText(minutes: number) {
   return `${h.toFixed(1)}h`;
 }
 
-const recentStudy = [
-  { title: "栈和队列", subject: "数据结构", time: "2小时前", mastery: 75 },
-  { title: "进程同步", subject: "操作系统", time: "5小时前", mastery: 45 },
-  { title: "TCP三次握手", subject: "计算机网络", time: "昨天", mastery: 60 },
-  { title: "矩阵运算", subject: "线性代数", time: "昨天", mastery: 30 },
-];
+/** ISO 时间字符串 -> 相对时间展示 */
+function toRelativeTime(iso: string | undefined | null): string {
+  if (!iso) return "—";
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "—";
+  const diffSec = Math.floor((Date.now() - t) / 1000);
+  if (diffSec < 60) return "刚刚";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}分钟前`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}小时前`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 7) return `${diffDay}天前`;
+  const d = new Date(t);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+interface RecentStudyItem {
+  id: number;
+  nodeId: number;
+  subjectId?: number;
+  title: string;
+  subject: string;
+  time: string;
+  mastery: number;
+}
 
 export default function StudyPage() {
   const router = useRouter();
   const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [todayMinutes, setTodayMinutes] = useState<number | null>(null);
   const [studiedToday, setStudiedToday] = useState<number | null>(null);
+  const [recentStudy, setRecentStudy] = useState<RecentStudyItem[]>([]);
+  const [recentLoading, setRecentLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +73,63 @@ export default function StudyPage() {
         setStudiedToday(overviewRes.value.data.studiedToday);
       }
     });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 拉真实"最近学习"：progress -> 按 lastReview 倒序 -> 取前 5 -> 并行查 node 元数据
+  useEffect(() => {
+    let cancelled = false;
+    setRecentLoading(true);
+    studyApi
+      .getProgress()
+      .then(async (res) => {
+        if (cancelled) return;
+        const progresses = (res.data || [])
+          .slice()
+          .sort((a, b) => {
+            const ta = a.lastReview ? Date.parse(a.lastReview) : 0;
+            const tb = b.lastReview ? Date.parse(b.lastReview) : 0;
+            // null/缺失 lastReview 排到最后
+            if (!ta && !tb) return 0;
+            if (!ta) return 1;
+            if (!tb) return -1;
+            return tb - ta;
+          })
+          .slice(0, 5);
+
+        if (progresses.length === 0) {
+          if (!cancelled) setRecentStudy([]);
+          return;
+        }
+
+        const nodeResults = await Promise.allSettled(
+          progresses.map((p) => knowledgeApi.getNode(p.nodeId)),
+        );
+
+        if (cancelled) return;
+        const items: RecentStudyItem[] = progresses.map((p, idx) => {
+          const r = nodeResults[idx];
+          const node = r.status === "fulfilled" ? r.value.data : undefined;
+          return {
+            id: p.id,
+            nodeId: p.nodeId,
+            subjectId: node?.subjectId,
+            title: node?.title ?? `知识点 #${p.nodeId}`,
+            subject: node?.subjectName ?? node?.topicName ?? "其他",
+            time: toRelativeTime(p.lastReview),
+            mastery: Math.round(p.masteryLevel ?? 0),
+          };
+        });
+        setRecentStudy(items);
+      })
+      .catch(() => {
+        if (!cancelled) setRecentStudy([]);
+      })
+      .finally(() => {
+        if (!cancelled) setRecentLoading(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -164,35 +246,71 @@ export default function StudyPage() {
 
       <div>
         <h2 className="text-lg font-semibold text-gray-200 mb-4">最近学习</h2>
-        <div className="space-y-2">
-          {recentStudy.map((item, idx) => (
-            <Card key={idx} className="border-white/[0.06] hover:border-white/[0.12] transition-colors cursor-pointer">
-              <CardContent className="p-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-lg font-bold text-gray-500">
-                    {idx + 1}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-200">{item.title}</p>
-                    <p className="text-xs text-gray-500">{item.subject} · {item.time}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-300">{item.mastery}%</p>
-                    <p className="text-xs text-gray-500">掌握度</p>
-                  </div>
-                  <div className="w-16 h-2 rounded-full bg-white/10 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-blue-500 transition-all"
-                      style={{ width: `${item.mastery}%` }}
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {recentLoading ? (
+          <div className="space-y-2">
+            {[0, 1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-[68px] rounded-xl bg-white/[0.04] border border-white/[0.06] animate-pulse"
+              />
+            ))}
+          </div>
+        ) : recentStudy.length === 0 ? (
+          <Card className="border-green-500/20 bg-green-500/5">
+            <CardContent className="p-4 flex items-center justify-between">
+              <p className="text-sm text-green-300">
+                还没有学习记录，去图谱开始第一节吧
+              </p>
+              <Button
+                className="border-green-500/40 bg-green-500/10 text-green-300 hover:bg-green-500/20"
+                variant="outline"
+                onClick={() => router.push("/subjects")}
+              >
+                去选学科 →
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {recentStudy.map((item, idx) => {
+              const target =
+                item.subjectId != null
+                  ? `/graph?subjectId=${item.subjectId}&focusNodeId=${item.nodeId}`
+                  : `/graph?focusNodeId=${item.nodeId}`;
+              return (
+                <Card
+                  key={item.id}
+                  className="border-white/[0.06] hover:border-white/[0.12] transition-colors cursor-pointer"
+                  onClick={() => router.push(target)}
+                >
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-lg font-bold text-gray-500">
+                        {idx + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-200">{item.title}</p>
+                        <p className="text-xs text-gray-500">{item.subject} · {item.time}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-gray-300">{item.mastery}%</p>
+                        <p className="text-xs text-gray-500">掌握度</p>
+                      </div>
+                      <div className="w-16 h-2 rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-blue-500 transition-all"
+                          style={{ width: `${item.mastery}%` }}
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

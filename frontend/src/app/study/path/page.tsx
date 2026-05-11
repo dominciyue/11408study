@@ -112,8 +112,11 @@ export default function StudyPathPage() {
                     variant="outline"
                     className="border-white/[0.08] hover:bg-white/10 text-gray-200"
                     onClick={() => {
-                      // 暂时跳到图谱页；后续可做“学习该节点”专页
-                      window.location.href = "/graph";
+                      const sid = node.subjectId ?? selectedSubjectId;
+                      const qs = sid
+                        ? `?subjectId=${sid}&focusNodeId=${node.id}`
+                        : `?focusNodeId=${node.id}`;
+                      window.location.href = `/graph${qs}`;
                     }}
                   >
                     去图谱

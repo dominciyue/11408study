@@ -8,11 +8,27 @@ import {
   Clock,
   Tag,
   MoreHorizontal,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { notesApi } from "@/lib/api";
 import type { Note } from "@/types";
 
@@ -20,6 +36,10 @@ export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [editing, setEditing] = useState<Note | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editContent, setEditContent] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,6 +70,33 @@ export default function NotesPage() {
     if (!content) return;
     const res = await notesApi.create({ nodeId: 1, title, content });
     setNotes((prev) => [res.data, ...prev]);
+  }
+
+  function openEdit(note: Note) {
+    setEditing(note);
+    setEditTitle(note.title || "");
+    setEditContent(note.content || "");
+  }
+
+  async function saveEdit() {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      const res = await notesApi.update(editing.id, {
+        title: editTitle,
+        content: editContent,
+      });
+      setNotes((prev) => prev.map((n) => (n.id === editing.id ? res.data : n)));
+      setEditing(null);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeNote(note: Note) {
+    if (!window.confirm(`确认删除笔记"${note.title}"？`)) return;
+    await notesApi.delete(note.id);
+    setNotes((prev) => prev.filter((n) => n.id !== note.id));
   }
 
   return (
@@ -98,9 +145,39 @@ export default function NotesPage() {
                 <h3 className="text-base font-semibold text-gray-100 group-hover:text-blue-400 transition-colors">
                   {note.title}
                 </h3>
-                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-300 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <MoreHorizontal className="w-4 h-4" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-600 hover:text-gray-300 h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity data-[state=open]:opacity-100"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="bg-[#0f0f17] border-white/[0.08] text-gray-200"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <DropdownMenuItem
+                      onSelect={() => openEdit(note)}
+                      className="cursor-pointer focus:bg-white/[0.06]"
+                    >
+                      <Pencil className="w-4 h-4 mr-2" />
+                      编辑
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="bg-white/[0.06]" />
+                    <DropdownMenuItem
+                      onSelect={() => removeNote(note)}
+                      className="cursor-pointer text-red-400 focus:bg-red-500/10 focus:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      删除
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <p className="text-sm text-gray-400 line-clamp-2 mb-3">{note.content}</p>
               <div className="flex items-center gap-2 mb-3">
@@ -125,6 +202,52 @@ export default function NotesPage() {
           ))
         )}
       </div>
+
+      <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent className="bg-[#0f0f17] border-white/[0.08] text-gray-200 sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-gray-100">编辑笔记</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">标题</label>
+              <Input
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="bg-white/5 border-white/[0.08]"
+                placeholder="笔记标题"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">内容</label>
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                rows={8}
+                className="w-full rounded-md bg-white/5 border border-white/[0.08] text-sm text-gray-200 p-3 resize-y focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                placeholder="笔记内容"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              className="border-white/[0.08] text-gray-300"
+              onClick={() => setEditing(null)}
+              disabled={saving}
+            >
+              取消
+            </Button>
+            <Button
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={saveEdit}
+              disabled={saving || !editTitle.trim()}
+            >
+              {saving ? "保存中..." : "保存"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

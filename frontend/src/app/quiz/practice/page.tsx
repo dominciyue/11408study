@@ -1,8 +1,8 @@
 "use client";
 
-import React, { Suspense, useEffect, useMemo, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ClipboardCheck, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { ClipboardCheck, ChevronLeft, ChevronRight, Sparkles, Timer as TimerIcon } from "lucide-react";
 import { knowledgeApi, quizApi } from "@/lib/api";
 import type { KnowledgeNode, QuizQuestion } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,16 +20,55 @@ function parseOptions(options?: string): string[] {
   }
 }
 
+const SUBJECT_NAMES: Record<number, string> = {
+  1: "政治",
+  2: "英一",
+  3: "数一",
+  4: "408",
+};
+
+const TIMED_PER_QUESTION = 60; // 秒
+
+function formatMMSS(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`;
+}
+
 function QuizPracticeInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const subjectId = Number(searchParams.get("subjectId") || "4"); // 默认 408
+  const adaptiveFlag = searchParams.get("adaptive") === "1";
+  const timedFlag = searchParams.get("timed") === "1";
+  const rawSubjectId = searchParams.get("subjectId");
+  const subjectId = rawSubjectId ? Number(rawSubjectId) : undefined;
+  // 缺省 subjectId 也走 adaptive
+  const useAdaptive = adaptiveFlag || subjectId == null;
+
+  type SubmitResult = { correct: boolean; correctAnswer: string; explanation?: string };
+
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [idx, setIdx] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
-  const [result, setResult] = useState<{ correct: boolean; correctAnswer: string; explanation?: string } | null>(null);
+  const [result, setResult] = useState<SubmitResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [aiOpen, setAiOpen] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(timedFlag ? TIMED_PER_QUESTION : null);
+
+  // 用 ref 保留最新 selected/result，避免 setInterval 闭包过期
+  const selectedRef = useRef<string | null>(null);
+  const resultRef = useRef<SubmitResult | null>(null);
+  const submittingRef = useRef(false);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
+  useEffect(() => {
+    resultRef.current = result;
+  }, [result]);
+
+  const q = questions[idx] || null;
+  const options = useMemo(() => parseOptions(q?.options), [q?.options]);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,16 +77,19 @@ function QuizPracticeInner() {
       setResult(null);
       setSelected(null);
       try {
-        // Feature 3: 优先调自适应推题（按应复习→低掌握→未学）；
-        // 若用户尚未登录或该端点不可用，回退到旧逻辑。
         let questionsData: QuizQuestion[] = [];
         try {
-          const adaptiveRes = await quizApi.adaptiveGenerate(subjectId, 10);
-          questionsData = adaptiveRes.data || [];
+          if (useAdaptive) {
+            const adaptiveRes = await quizApi.adaptiveGenerate(undefined, 10);
+            questionsData = adaptiveRes.data || [];
+          } else {
+            const adaptiveRes = await quizApi.adaptiveGenerate(subjectId, 10);
+            questionsData = adaptiveRes.data || [];
+          }
         } catch (_err) {
           // 静默降级
         }
-        if (questionsData.length === 0) {
+        if (questionsData.length === 0 && subjectId != null) {
           const nodesRes = await knowledgeApi.getNodes({ subjectId });
           const nodeIds = nodesRes.data.slice(0, 20).map((n: KnowledgeNode) => n.id);
           const quizRes = await quizApi.generate(nodeIds, 10);
@@ -65,24 +107,84 @@ function QuizPracticeInner() {
     return () => {
       cancelled = true;
     };
-  }, [subjectId]);
+  }, [subjectId, useAdaptive]);
 
-  const q = questions[idx] || null;
-  const options = useMemo(() => parseOptions(q?.options), [q?.options]);
+  // 提交（手动 / 自动），auto=true 时未选当作错（提交一个占位串）
+  const submit = useCallback(
+    async (auto = false) => {
+      if (!q) return;
+      if (submittingRef.current) return;
+      if (resultRef.current) return; // 已经提交过
+      const userAnswer = selectedRef.current ?? (auto ? "(超时未作答)" : null);
+      if (userAnswer == null) return;
+      submittingRef.current = true;
+      try {
+        const res = await quizApi.submit({ questionId: q.id, userAnswer });
+        setResult(res.data);
+      } finally {
+        submittingRef.current = false;
+      }
+    },
+    [q]
+  );
 
-  async function submit() {
-    if (!q || selected == null) return;
-    const res = await quizApi.submit({ questionId: q.id, userAnswer: selected });
-    setResult(res.data);
-  }
+  // 切题时重置 timer / 选项 / 结果
+  useEffect(() => {
+    setSelected(null);
+    setResult(null);
+    if (timedFlag) setTimeLeft(TIMED_PER_QUESTION);
+    else setTimeLeft(null);
+  }, [idx, timedFlag]);
+
+  // 倒计时（仅 timed 模式 + 当前题未提交时跑）
+  useEffect(() => {
+    if (!timedFlag) return;
+    if (!q) return;
+    if (result) return; // 已提交，停表
+    const t = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev == null) return prev;
+        if (prev <= 1) {
+          clearInterval(t);
+          // 触发自动提交
+          submit(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [timedFlag, q, result, submit, idx]);
+
+  const headerBadge = useMemo(() => {
+    if (adaptiveFlag) return { text: "自适应", cls: "bg-purple-500/20 text-purple-300" };
+    if (timedFlag) return { text: "限时模拟", cls: "bg-red-500/20 text-red-300" };
+    if (subjectId != null && SUBJECT_NAMES[subjectId])
+      return { text: SUBJECT_NAMES[subjectId], cls: "bg-blue-500/20 text-blue-300" };
+    return { text: "自适应", cls: "bg-purple-500/20 text-purple-300" };
+  }, [adaptiveFlag, timedFlag, subjectId]);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <ClipboardCheck className="w-6 h-6 text-blue-400" />
-          <h1 className="text-2xl font-bold text-white">专项练习</h1>
-          <Badge className="bg-blue-500/20 text-blue-400">{subjectId}</Badge>
+          <h1 className="text-2xl font-bold text-white">
+            {timedFlag ? "限时模拟" : adaptiveFlag ? "智能组卷" : "专项练习"}
+          </h1>
+          <Badge className={headerBadge.cls}>{headerBadge.text}</Badge>
+          {timedFlag && timeLeft != null ? (
+            <Badge
+              className={
+                timeLeft < 10
+                  ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                  : "bg-orange-500/15 text-orange-300 border border-orange-500/20"
+              }
+            >
+              <TimerIcon className="w-3.5 h-3.5 mr-1" />
+              {formatMMSS(timeLeft)}
+            </Badge>
+          ) : null}
         </div>
         <Button variant="outline" className="border-white/[0.08] text-gray-200" onClick={() => router.push("/quiz")}>
           返回
@@ -110,6 +212,7 @@ function QuizPracticeInner() {
                         : "border-white/[0.08] hover:bg-white/10 text-gray-200 justify-start"
                     }
                     onClick={() => setSelected(opt)}
+                    disabled={!!result}
                   >
                     {opt}
                   </Button>
@@ -117,7 +220,11 @@ function QuizPracticeInner() {
               </div>
 
               <div className="flex gap-2">
-                <Button className="bg-blue-600 hover:bg-blue-700" disabled={!selected} onClick={submit}>
+                <Button
+                  className="bg-blue-600 hover:bg-blue-700"
+                  disabled={!selected || !!result}
+                  onClick={() => submit(false)}
+                >
                   提交
                 </Button>
                 <Button
@@ -127,6 +234,7 @@ function QuizPracticeInner() {
                     setSelected(null);
                     setResult(null);
                   }}
+                  disabled={!!result}
                 >
                   重选
                 </Button>
@@ -177,8 +285,6 @@ function QuizPracticeInner() {
               disabled={idx <= 0}
               onClick={() => {
                 setIdx((v) => Math.max(0, v - 1));
-                setSelected(null);
-                setResult(null);
               }}
             >
               <ChevronLeft className="w-4 h-4 mr-2" />
@@ -190,8 +296,6 @@ function QuizPracticeInner() {
               disabled={idx >= questions.length - 1}
               onClick={() => {
                 setIdx((v) => Math.min(questions.length - 1, v + 1));
-                setSelected(null);
-                setResult(null);
               }}
             >
               下一题
@@ -217,4 +321,3 @@ export default function QuizPracticePage() {
     </Suspense>
   );
 }
-
