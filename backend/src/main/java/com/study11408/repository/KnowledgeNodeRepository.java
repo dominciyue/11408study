@@ -28,10 +28,17 @@ public interface KnowledgeNodeRepository extends JpaRepository<KnowledgeNode, Lo
 
     @Query("SELECT n FROM KnowledgeNode n WHERE " +
            "(:topicId IS NULL OR n.topic.id = :topicId) AND " +
-           "(:subjectId IS NULL OR n.topic.subject.id = :subjectId) AND " +
-           "(:keyword IS NULL OR LOWER(n.title) LIKE LOWER(CONCAT('%', :keyword, '%')))")
+           "(:subjectId IS NULL OR n.topic.subject.id = :subjectId)")
     Page<KnowledgeNode> findFiltered(@Param("topicId") Long topicId,
                                      @Param("subjectId") Long subjectId,
-                                     @Param("keyword") String keyword,
                                      Pageable pageable);
+
+    @Query("SELECT n FROM KnowledgeNode n WHERE " +
+           "(:topicId IS NULL OR n.topic.id = :topicId) AND " +
+           "(:subjectId IS NULL OR n.topic.subject.id = :subjectId) AND " +
+           "LOWER(n.title) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    Page<KnowledgeNode> findFilteredByKeyword(@Param("topicId") Long topicId,
+                                              @Param("subjectId") Long subjectId,
+                                              @Param("keyword") String keyword,
+                                              Pageable pageable);
 }

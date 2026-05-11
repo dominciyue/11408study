@@ -31,7 +31,11 @@ public class KnowledgeGraphService {
     private final AiClientService aiClientService;
 
     public Page<KnowledgeNodeDTO> getNodes(Long topicId, Long subjectId, String keyword, Pageable pageable) {
-        return nodeRepository.findFiltered(topicId, subjectId, keyword, pageable)
+        String normalizedKeyword = keyword == null ? null : keyword.trim();
+        Page<KnowledgeNode> nodes = (normalizedKeyword == null || normalizedKeyword.isEmpty())
+                ? nodeRepository.findFiltered(topicId, subjectId, pageable)
+                : nodeRepository.findFilteredByKeyword(topicId, subjectId, normalizedKeyword, pageable);
+        return nodes
                 .map(this::toNodeDTO);
     }
 
