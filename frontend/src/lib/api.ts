@@ -99,8 +99,11 @@ export const knowledgeApi = {
     api.post<unknown, ApiResponse<KnowledgeEdge>>("/knowledge/edges", data),
   getEdges: (params?: { subjectId?: number }) =>
     api.get<unknown, ApiResponse<KnowledgeEdge[]>>("/knowledge/edges", { params }),
-  getGraphData: (params?: { subjectId?: number; topicId?: number }) =>
-    api.get<unknown, ApiResponse<GraphData>>("/knowledge/graph", { params }),
+  getGraphData: (params: { subjectId: number; topicId?: number }) =>
+    api.get<unknown, ApiResponse<GraphData>>(
+      `/knowledge/graph/${params.subjectId}`,
+      params.topicId ? { params: { topicId: params.topicId } } : undefined,
+    ),
 };
 
 // ─── Study ───────────────────────────────────────────────────────────────────

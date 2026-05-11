@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useMemo } from "react";
+import React, {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import { useSearchParams } from "next/navigation";
 import {
   ReactFlow,
   Background,
@@ -8,6 +15,8 @@ import {
   MiniMap,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
   type Node,
   type Edge,
   type NodeTypes,
@@ -15,10 +24,18 @@ import {
   MarkerType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import dagre from "@dagrejs/dagre";
+import { Loader2 } from "lucide-react";
 import { KnowledgeNode } from "@/components/graph/knowledge-node";
 import { NodeDetailPanel } from "@/components/graph/node-detail-panel";
 import { GraphToolbar, type MasteryFilter } from "@/components/graph/graph-toolbar";
+import { knowledgeApi } from "@/lib/api";
+import type {
+  KnowledgeNode as KnowledgeNodeType,
+  KnowledgeEdge as KnowledgeEdgeType,
+} from "@/types";
 
+/** 0-100 掌握度 -> 1..5 星；<=0 / undefined 视为 0 */
 function masteryToStarsLevel(m: number | undefined): number {
   if (m == null || !Number.isFinite(m)) return 0;
   const v = Math.max(0, Math.min(100, m));
@@ -34,98 +51,240 @@ const nodeTypes: NodeTypes = {
   knowledge: KnowledgeNode,
 };
 
+/** 边类型 -> 颜色 */
 const edgeColors: Record<string, string> = {
   PREREQUISITE: "#f97316",
   RELATED: "#3b82f6",
   EXTENDS: "#22c55e",
   CROSS_SUBJECT: "#a855f7",
+  INCLUDES: "#22c55e", // 兜底：includes 视作 extends 类绿色
 };
 
-const edgeDash: Record<string, number[]> = {
-  PREREQUISITE: [],
-  RELATED: [5, 5],
-  EXTENDS: [8, 4],
-  CROSS_SUBJECT: [3, 3],
+/** 边类型 -> 虚线样式（空数组 = 实线） */
+const edgeDashArray: Record<string, string | undefined> = {
+  PREREQUISITE: undefined,
+  RELATED: "5 5",
+  EXTENDS: undefined,
+  CROSS_SUBJECT: "3 3",
+  INCLUDES: undefined,
 };
 
-const sampleNodes: Node[] = [
-  { id: "1", type: "knowledge", position: { x: 0, y: 0 }, data: { label: "线性表概述", topicName: "数据结构", difficulty: "EASY" } },
-  { id: "2", type: "knowledge", position: { x: -200, y: 150 }, data: { label: "顺序表", topicName: "数据结构", difficulty: "EASY" } },
-  { id: "3", type: "knowledge", position: { x: 200, y: 150 }, data: { label: "单链表", topicName: "数据结构", difficulty: "EASY" } },
-  { id: "4", type: "knowledge", position: { x: 300, y: 300 }, data: { label: "双链表", topicName: "数据结构", difficulty: "MEDIUM" } },
-  { id: "5", type: "knowledge", position: { x: -300, y: 300 }, data: { label: "栈", topicName: "数据结构", difficulty: "EASY" } },
-  { id: "6", type: "knowledge", position: { x: -100, y: 300 }, data: { label: "队列", topicName: "数据结构", difficulty: "EASY" } },
-  { id: "7", type: "knowledge", position: { x: 0, y: 450 }, data: { label: "二叉树", topicName: "数据结构", difficulty: "MEDIUM", mastery: 65 } },
-  { id: "8", type: "knowledge", position: { x: -200, y: 600 }, data: { label: "二叉树遍历", topicName: "数据结构", difficulty: "MEDIUM", mastery: 45 } },
-  { id: "9", type: "knowledge", position: { x: 200, y: 600 }, data: { label: "二叉排序树(BST)", topicName: "数据结构", difficulty: "MEDIUM" } },
-  { id: "10", type: "knowledge", position: { x: 200, y: 750 }, data: { label: "平衡二叉树(AVL)", topicName: "数据结构", difficulty: "HARD" } },
-  { id: "11", type: "knowledge", position: { x: 500, y: 0 }, data: { label: "图的基本概念", topicName: "数据结构", difficulty: "EASY" } },
-  { id: "12", type: "knowledge", position: { x: 500, y: 150 }, data: { label: "图的遍历", topicName: "数据结构", difficulty: "MEDIUM" } },
-  { id: "13", type: "knowledge", position: { x: 400, y: 300 }, data: { label: "最短路径", topicName: "数据结构", difficulty: "HARD" } },
-  { id: "14", type: "knowledge", position: { x: 700, y: 150 }, data: { label: "进程与线程", topicName: "操作系统", difficulty: "MEDIUM", mastery: 30 } },
-  { id: "15", type: "knowledge", position: { x: 700, y: 300 }, data: { label: "进程调度算法", topicName: "操作系统", difficulty: "MEDIUM" } },
-  { id: "16", type: "knowledge", position: { x: 900, y: 150 }, data: { label: "TCP协议", topicName: "计算机网络", difficulty: "MEDIUM" } },
-  { id: "17", type: "knowledge", position: { x: 900, y: 300 }, data: { label: "TCP三次握手", topicName: "计算机网络", difficulty: "HARD", mastery: 80 } },
-  { id: "18", type: "knowledge", position: { x: 900, y: 450 }, data: { label: "TCP拥塞控制", topicName: "计算机网络", difficulty: "HARD" } },
-  { id: "19", type: "knowledge", position: { x: 700, y: 450 }, data: { label: "路由算法", topicName: "计算机网络", difficulty: "HARD" } },
-];
+const NODE_WIDTH = 180;
+const NODE_HEIGHT = 60;
 
-const sampleEdges: Edge[] = [
-  { id: "e1-2", source: "1", target: "2", style: { stroke: edgeColors.PREREQUISITE }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.PREREQUISITE }, data: { relationType: "PREREQUISITE" } },
-  { id: "e1-3", source: "1", target: "3", style: { stroke: edgeColors.PREREQUISITE }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.PREREQUISITE }, data: { relationType: "PREREQUISITE" } },
-  { id: "e3-4", source: "3", target: "4", style: { stroke: edgeColors.EXTENDS, strokeDasharray: "8 4" }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.EXTENDS }, data: { relationType: "EXTENDS" } },
-  { id: "e1-5", source: "1", target: "5", style: { stroke: edgeColors.PREREQUISITE }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.PREREQUISITE }, data: { relationType: "PREREQUISITE" } },
-  { id: "e1-6", source: "1", target: "6", style: { stroke: edgeColors.PREREQUISITE }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.PREREQUISITE }, data: { relationType: "PREREQUISITE" } },
-  { id: "e7-8", source: "7", target: "8", style: { stroke: edgeColors.PREREQUISITE }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.PREREQUISITE }, data: { relationType: "PREREQUISITE" } },
-  { id: "e8-9", source: "8", target: "9", style: { stroke: edgeColors.PREREQUISITE }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.PREREQUISITE }, data: { relationType: "PREREQUISITE" } },
-  { id: "e9-10", source: "9", target: "10", style: { stroke: edgeColors.EXTENDS }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.EXTENDS }, data: { relationType: "EXTENDS" } },
-  { id: "e11-12", source: "11", target: "12", style: { stroke: edgeColors.PREREQUISITE }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.PREREQUISITE }, data: { relationType: "PREREQUISITE" } },
-  { id: "e12-13", source: "12", target: "13", style: { stroke: edgeColors.PREREQUISITE }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.PREREQUISITE }, data: { relationType: "PREREQUISITE" } },
-  { id: "e14-15", source: "14", target: "15", style: { stroke: edgeColors.PREREQUISITE }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.PREREQUISITE }, data: { relationType: "PREREQUISITE" } },
-  { id: "e6-15", source: "6", target: "15", style: { stroke: edgeColors.CROSS_SUBJECT, strokeDasharray: "3 3" }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.CROSS_SUBJECT }, data: { relationType: "CROSS_SUBJECT" } },
-  { id: "e12-19", source: "12", target: "19", style: { stroke: edgeColors.CROSS_SUBJECT, strokeDasharray: "3 3" }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.CROSS_SUBJECT }, data: { relationType: "CROSS_SUBJECT" } },
-  { id: "e13-19", source: "13", target: "19", style: { stroke: edgeColors.CROSS_SUBJECT, strokeDasharray: "3 3" }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.CROSS_SUBJECT }, data: { relationType: "CROSS_SUBJECT" } },
-  { id: "e16-17", source: "16", target: "17", style: { stroke: edgeColors.PREREQUISITE }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.PREREQUISITE }, data: { relationType: "PREREQUISITE" } },
-  { id: "e16-18", source: "16", target: "18", style: { stroke: edgeColors.PREREQUISITE }, markerEnd: { type: MarkerType.ArrowClosed, color: edgeColors.PREREQUISITE }, data: { relationType: "PREREQUISITE" } },
-];
+/**
+ * 后端 difficulty 可能是 string (EASY/MEDIUM/HARD) 或 number (1-5)。
+ * KnowledgeNode 组件用字符串映射 EASY/MEDIUM/HARD，所以统一转字符串。
+ */
+function normalizeDifficulty(d: unknown): string {
+  if (typeof d === "string") {
+    const u = d.toUpperCase();
+    if (u === "EASY" || u === "MEDIUM" || u === "HARD") return u;
+    // 1/2/3 也可能以字符串形式来
+    const n = Number(d);
+    if (Number.isFinite(n)) return numberToDiffString(n);
+    return "MEDIUM";
+  }
+  if (typeof d === "number") return numberToDiffString(d);
+  return "MEDIUM";
+}
 
-export default function GraphPage() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(sampleNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(sampleEdges);
+function numberToDiffString(n: number): string {
+  if (n <= 1) return "EASY";
+  if (n >= 3) return "HARD";
+  return "MEDIUM";
+}
+
+function normalizeRelation(r: unknown): string {
+  if (typeof r !== "string") return "RELATED";
+  return r.toUpperCase();
+}
+
+/**
+ * 使用 dagre 计算横向布局，写回到 xyflow Node.position。
+ * dagre 的 (x,y) 是节点中心点；xyflow 用左上角，所以要减半宽/半高。
+ */
+function layoutWithDagre(
+  nodes: KnowledgeNodeType[],
+  edges: KnowledgeEdgeType[],
+): Array<KnowledgeNodeType & { position: { x: number; y: number } }> {
+  const g = new dagre.graphlib.Graph();
+  g.setDefaultEdgeLabel(() => ({}));
+  g.setGraph({ rankdir: "LR", nodesep: 50, ranksep: 80 });
+
+  nodes.forEach((n) => {
+    g.setNode(String(n.id), { width: NODE_WIDTH, height: NODE_HEIGHT });
+  });
+  edges.forEach((e) => {
+    if (e.sourceId == null || e.targetId == null) return;
+    g.setEdge(String(e.sourceId), String(e.targetId));
+  });
+  dagre.layout(g);
+
+  return nodes.map((n) => {
+    const p = g.node(String(n.id));
+    return {
+      ...n,
+      position: p
+        ? { x: p.x - NODE_WIDTH / 2, y: p.y - NODE_HEIGHT / 2 }
+        : { x: 0, y: 0 },
+    };
+  });
+}
+
+function toXyflowNode(
+  n: KnowledgeNodeType & { position: { x: number; y: number } },
+): Node {
+  return {
+    id: String(n.id),
+    type: "knowledge",
+    position: n.position,
+    data: {
+      label: n.title,
+      topicName: n.topicName || "",
+      subjectName: n.subjectName || "",
+      difficulty: normalizeDifficulty(n.difficulty),
+      mastery: typeof n.mastery === "number" ? n.mastery : undefined,
+      // 透传，便于详情面板使用
+      _content: n.content || "",
+      _topicId: n.topicId,
+      _subjectId: n.subjectId,
+    },
+  };
+}
+
+function toXyflowEdge(e: KnowledgeEdgeType): Edge {
+  const rel = normalizeRelation(e.relationship);
+  const color = edgeColors[rel] || edgeColors.RELATED;
+  const dash = edgeDashArray[rel];
+  return {
+    id: `e-${e.id}`,
+    source: String(e.sourceId),
+    target: String(e.targetId),
+    label: e.label,
+    style: {
+      stroke: color,
+      strokeWidth: 1.5,
+      ...(dash ? { strokeDasharray: dash } : {}),
+    },
+    markerEnd: { type: MarkerType.ArrowClosed, color },
+    data: { relationType: rel },
+  };
+}
+
+function GraphPageInner() {
+  const searchParams = useSearchParams();
+  const subjectIdParam = searchParams.get("subjectId");
+  const topicIdParam = searchParams.get("topicId");
+
+  const subjectId = Number(subjectIdParam);
+  const topicId = topicIdParam ? Number(topicIdParam) : null;
+
+  const hasValidSubject = Number.isFinite(subjectId) && subjectId > 0;
+  const hasValidTopic =
+    topicId !== null && Number.isFinite(topicId) && topicId > 0;
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+  const [rawNodes, setRawNodes] = useState<KnowledgeNodeType[]>([]);
+  const [rawEdges, setRawEdges] = useState<KnowledgeEdgeType[]>([]);
+
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSubject, setActiveSubject] = useState<string | null>(null);
   const [masteryFilter, setMasteryFilter] = useState<MasteryFilter>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // 当 masteryFilter 变化时：把不匹配的节点 dimmed=true，匹配的 dimmed=false
-  // null = 显示全部；0 = 仅未学；1-5 = 仅匹配星级
+  const reactFlow = useReactFlow();
+
+  // 拉数据
+  useEffect(() => {
+    if (!hasValidSubject) {
+      setIsLoading(false);
+      setErrorMsg("缺少 subjectId 参数，请从 /subjects 页面进入。");
+      return;
+    }
+    let cancelled = false;
+    setIsLoading(true);
+    setErrorMsg(null);
+    knowledgeApi
+      .getGraphData({ subjectId })
+      .then((res) => {
+        if (cancelled) return;
+        const data = res.data || { nodes: [], edges: [] };
+        setRawNodes(data.nodes || []);
+        setRawEdges(data.edges || []);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const msg =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: unknown }).message)
+            : "图谱加载失败";
+        setErrorMsg(msg);
+        setRawNodes([]);
+        setRawEdges([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [subjectId, hasValidSubject]);
+
+  // 布局 + 映射成 xyflow 节点/边
+  useEffect(() => {
+    if (rawNodes.length === 0) {
+      setNodes([]);
+      setEdges([]);
+      return;
+    }
+    const positioned = layoutWithDagre(rawNodes, rawEdges);
+    const xyNodes = positioned.map(toXyflowNode);
+    const xyEdges = rawEdges.map(toXyflowEdge);
+    setNodes(xyNodes);
+    setEdges(xyEdges);
+  }, [rawNodes, rawEdges, setNodes, setEdges]);
+
+  // masteryFilter + topicId 联合作用：不匹配的 dimmed
   useEffect(() => {
     setNodes((nds) =>
       nds.map((n) => {
         const m =
           typeof n.data.mastery === "number" ? (n.data.mastery as number) : undefined;
         const stars = masteryToStarsLevel(m);
-        const matches =
+        const masteryMatch =
           masteryFilter === null ? true : stars === masteryFilter;
+        const rawTopicId = (n.data as Record<string, unknown>)._topicId;
+        const nodeTopicId =
+          typeof rawTopicId === "number" ? rawTopicId : undefined;
+        const topicMatch = hasValidTopic ? nodeTopicId === topicId : true;
+        const matches = masteryMatch && topicMatch;
         return {
           ...n,
           data: { ...n.data, dimmed: !matches },
         };
-      })
+      }),
     );
-  }, [masteryFilter, setNodes]);
+    // 注意：这里依赖 rawNodes 而非 nodes，避免 setNodes 引起的无限循环
+    // setNodes 不会触发本 effect 重跑（它来自 useNodesState）
+  }, [masteryFilter, topicId, hasValidTopic, setNodes, rawNodes]);
 
   const selectedNode = useMemo(() => {
     if (!selectedNodeId) return null;
     const node = nodes.find((n) => n.id === selectedNodeId);
     if (!node) return null;
+    const d = node.data as Record<string, unknown>;
     return {
       id: node.id,
-      title: String(node.data.label || ""),
-      content: "知识点详细内容将从后端 API 加载...",
-      difficulty: String(node.data.difficulty || "MEDIUM"),
-      topicName: String(node.data.topicName || ""),
-      mastery: typeof node.data.mastery === "number" ? node.data.mastery : undefined,
+      title: String(d.label || ""),
+      content: String(d._content || ""),
+      difficulty: String(d.difficulty || "MEDIUM"),
+      topicName: String(d.topicName || ""),
+      subjectName: String(d.subjectName || ""),
+      mastery: typeof d.mastery === "number" ? (d.mastery as number) : undefined,
     };
   }, [selectedNodeId, nodes]);
 
@@ -139,24 +298,29 @@ export default function GraphPage() {
         return {
           id: otherId,
           title: otherNode ? String(otherNode.data.label || "") : otherId,
-          relationType: String((e.data as Record<string, unknown>)?.relationType || "RELATED"),
+          relationType: String(
+            (e.data as Record<string, unknown>)?.relationType || "RELATED",
+          ),
         };
       });
   }, [selectedNodeId, edges, nodes]);
 
-  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
-    setSelectedNodeId(node.id);
-    setNodes((nds) =>
-      nds.map((n) => ({
-        ...n,
-        data: {
-          ...n.data,
-          selected: n.id === node.id,
-          dimmed: false,
-        },
-      }))
-    );
-  }, [setNodes]);
+  const onNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node) => {
+      setSelectedNodeId(node.id);
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          data: {
+            ...n.data,
+            selected: n.id === node.id,
+            dimmed: false,
+          },
+        })),
+      );
+    },
+    [setNodes],
+  );
 
   const onPaneClick = useCallback(() => {
     setSelectedNodeId(null);
@@ -164,19 +328,33 @@ export default function GraphPage() {
       nds.map((n) => ({
         ...n,
         data: { ...n.data, selected: false, dimmed: false },
-      }))
+      })),
     );
   }, [setNodes]);
 
-  const handleRelatedNodeClick = useCallback((nodeId: string) => {
-    setSelectedNodeId(nodeId);
-    setNodes((nds) =>
-      nds.map((n) => ({
-        ...n,
-        data: { ...n.data, selected: n.id === nodeId, dimmed: false },
-      }))
-    );
-  }, [setNodes]);
+  const handleRelatedNodeClick = useCallback(
+    (nodeId: string) => {
+      setSelectedNodeId(nodeId);
+      setNodes((nds) =>
+        nds.map((n) => ({
+          ...n,
+          data: { ...n.data, selected: n.id === nodeId, dimmed: false },
+        })),
+      );
+    },
+    [setNodes],
+  );
+
+  const handleZoomIn = useCallback(() => reactFlow.zoomIn(), [reactFlow]);
+  const handleZoomOut = useCallback(() => reactFlow.zoomOut(), [reactFlow]);
+  const handleFitView = useCallback(
+    () => reactFlow.fitView({ padding: 0.2 }),
+    [reactFlow],
+  );
+  const handleReset = useCallback(
+    () => reactFlow.fitView({ padding: 0.2 }),
+    [reactFlow],
+  );
 
   return (
     <div className="flex h-[calc(100vh-4rem)] -m-6 relative">
@@ -188,69 +366,120 @@ export default function GraphPage() {
           onSubjectFilter={setActiveSubject}
           masteryFilter={masteryFilter}
           onMasteryFilter={setMasteryFilter}
-          onZoomIn={() => {}}
-          onZoomOut={() => {}}
-          onFitView={() => {}}
-          onReset={() => {}}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onFitView={handleFitView}
+          onReset={handleReset}
           nodeCount={nodes.length}
           edgeCount={edges.length}
         />
-        <ReactFlow
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onNodeClick={onNodeClick}
-          onPaneClick={onPaneClick}
-          nodeTypes={nodeTypes}
-          fitView
-          minZoom={0.1}
-          maxZoom={2}
-          defaultEdgeOptions={{
-            animated: false,
-            style: { strokeWidth: 1.5 },
-          }}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="rgba(255,255,255,0.03)" />
-          <Controls
-            className="!bg-[#111118]/90 !border-white/[0.08] !rounded-lg [&_button]:!bg-transparent [&_button]:!border-white/[0.06] [&_button]:!text-gray-400 [&_button:hover]:!bg-white/5"
-            position="bottom-left"
-          />
-          <MiniMap
-            className="!bg-[#111118]/90 !border-white/[0.08] !rounded-lg"
-            maskColor="rgba(0,0,0,0.7)"
-            nodeColor={(node) => {
-              const topic = String(node.data?.topicName || "");
-              if (topic.includes("数据结构")) return "#a855f7";
-              if (topic.includes("操作系统")) return "#a855f7";
-              if (topic.includes("计算机网络")) return "#a855f7";
-              if (topic.includes("组成原理")) return "#a855f7";
-              return "#3b82f6";
+
+        {isLoading ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0f0f17] text-gray-500">
+            <Loader2 className="w-6 h-6 animate-spin mr-2" />
+            图谱加载中…
+          </div>
+        ) : errorMsg ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0f0f17]">
+            <div className="max-w-md text-center text-sm text-red-400 px-6 py-4 rounded-lg border border-red-500/20 bg-red-500/5">
+              {errorMsg}
+            </div>
+          </div>
+        ) : nodes.length === 0 ? (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#0f0f17]">
+            <div className="text-center text-gray-500">
+              <p className="text-base mb-2">该学科暂无知识点</p>
+              <p className="text-xs text-gray-600">
+                请在管理端导入学科种子或资料解析后再来查看。
+              </p>
+            </div>
+          </div>
+        ) : (
+          <ReactFlow
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onNodeClick={onNodeClick}
+            onPaneClick={onPaneClick}
+            nodeTypes={nodeTypes}
+            fitView
+            minZoom={0.1}
+            maxZoom={2}
+            defaultEdgeOptions={{
+              animated: false,
+              style: { strokeWidth: 1.5 },
             }}
-            position="bottom-right"
-          />
-        </ReactFlow>
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background
+              variant={BackgroundVariant.Dots}
+              gap={20}
+              size={1}
+              color="rgba(255,255,255,0.03)"
+            />
+            <Controls
+              className="!bg-[#111118]/90 !border-white/[0.08] !rounded-lg [&_button]:!bg-transparent [&_button]:!border-white/[0.06] [&_button]:!text-gray-400 [&_button:hover]:!bg-white/5"
+              position="bottom-left"
+            />
+            <MiniMap
+              className="!bg-[#111118]/90 !border-white/[0.08] !rounded-lg"
+              maskColor="rgba(0,0,0,0.7)"
+              nodeColor={(node) => {
+                const topic = String(node.data?.topicName || "");
+                if (
+                  topic.includes("数据结构") ||
+                  topic.includes("操作系统") ||
+                  topic.includes("计算机网络") ||
+                  topic.includes("组成原理")
+                )
+                  return "#a855f7";
+                if (
+                  topic.includes("高等数学") ||
+                  topic.includes("线性代数") ||
+                  topic.includes("概率")
+                )
+                  return "#22c55e";
+                return "#3b82f6";
+              }}
+              position="bottom-right"
+            />
+          </ReactFlow>
+        )}
 
         {/* Legend */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 px-4 py-2 rounded-lg bg-[#111118]/90 backdrop-blur-md border border-white/[0.08] text-[11px]">
-          <div className="flex items-center gap-1.5">
-            <div className="w-6 h-0.5 bg-orange-500" />
-            <span className="text-gray-500">前置依赖</span>
+        {!isLoading && nodes.length > 0 && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 px-4 py-2 rounded-lg bg-[#111118]/90 backdrop-blur-md border border-white/[0.08] text-[11px]">
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-0.5 bg-orange-500" />
+              <span className="text-gray-500">前置依赖</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div
+                className="w-6 h-0.5 bg-blue-500"
+                style={{
+                  backgroundImage:
+                    "repeating-linear-gradient(90deg, #3b82f6 0, #3b82f6 5px, transparent 5px, transparent 10px)",
+                }}
+              />
+              <span className="text-gray-500">相关知识</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-6 h-0.5 bg-green-500" />
+              <span className="text-gray-500">深入拓展</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div
+                className="w-6 h-0.5 bg-purple-500"
+                style={{
+                  backgroundImage:
+                    "repeating-linear-gradient(90deg, #a855f7 0, #a855f7 3px, transparent 3px, transparent 6px)",
+                }}
+              />
+              <span className="text-gray-500">跨学科</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-6 h-0.5 bg-blue-500" style={{ backgroundImage: "repeating-linear-gradient(90deg, #3b82f6 0, #3b82f6 5px, transparent 5px, transparent 10px)" }} />
-            <span className="text-gray-500">相关知识</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-6 h-0.5 bg-green-500" />
-            <span className="text-gray-500">深入拓展</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-6 h-0.5 bg-purple-500" style={{ backgroundImage: "repeating-linear-gradient(90deg, #a855f7 0, #a855f7 3px, transparent 3px, transparent 6px)" }} />
-            <span className="text-gray-500">跨学科</span>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Detail panel */}
@@ -266,5 +495,22 @@ export default function GraphPage() {
         />
       )}
     </div>
+  );
+}
+
+export default function GraphPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-[calc(100vh-4rem)] text-gray-500">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+          加载中…
+        </div>
+      }
+    >
+      <ReactFlowProvider>
+        <GraphPageInner />
+      </ReactFlowProvider>
+    </Suspense>
   );
 }

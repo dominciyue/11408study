@@ -22,11 +22,13 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/stores/auth-store";
 
+// V1 seed 顺序：政治=1, 英语一=2, 数学一=3, 408=4。
+// 详情页 /subjects/[id] 接收数字 id，不识别 code 字符串。
 const subjectItems = [
-  { name: "政治", href: "/subjects/politics", color: "bg-red-500", textColor: "text-red-400" },
-  { name: "英语一", href: "/subjects/english", color: "bg-blue-500", textColor: "text-blue-400" },
-  { name: "数学一", href: "/subjects/math", color: "bg-green-500", textColor: "text-green-400" },
-  { name: "408计算机", href: "/subjects/cs408", color: "bg-purple-500", textColor: "text-purple-400" },
+  { name: "政治", href: "/subjects/1", color: "bg-red-500", textColor: "text-red-400" },
+  { name: "英语一", href: "/subjects/2", color: "bg-blue-500", textColor: "text-blue-400" },
+  { name: "数学一", href: "/subjects/3", color: "bg-green-500", textColor: "text-green-400" },
+  { name: "408计算机", href: "/subjects/4", color: "bg-purple-500", textColor: "text-purple-400" },
 ];
 
 const navItems = [

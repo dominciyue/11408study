@@ -32,7 +32,16 @@ export const useGraphStore = create<GraphState & GraphActions>((set, get) => ({
     set({ isLoading: true });
     try {
       const params = filters || get().filters;
-      const res = await knowledgeApi.getGraphData(params);
+      // getGraphData 现在要求 subjectId 必填（后端是 path param）。
+      // 没有 subjectId 时直接清空图，不做请求。
+      if (typeof params.subjectId !== "number") {
+        set({ nodes: [], edges: [], isLoading: false });
+        return;
+      }
+      const res = await knowledgeApi.getGraphData({
+        subjectId: params.subjectId,
+        topicId: params.topicId,
+      });
       set({ nodes: res.data.nodes, edges: res.data.edges, isLoading: false });
     } catch {
       set({ isLoading: false });
