@@ -21,6 +21,7 @@ import type {
   StudyPlanRecord,
   WeeklyReport,
   User,
+  CuratedStudyPath,
 } from "@/types";
 import { getToken, clearAuth } from "@/lib/auth";
 
@@ -144,6 +145,16 @@ export const studyApi = {
     api.delete<unknown, ApiResponse<void>>(`/study/ai-plans/${planId}`),
 };
 
+// ─── Curated Study Paths (V13) ─────────────────────────────────────────────
+export const studyPathsApi = {
+  list: (subjectId?: number) =>
+    api.get<unknown, ApiResponse<CuratedStudyPath[]>>("/study-paths", {
+      params: subjectId ? { subjectId } : undefined,
+    }),
+  get: (id: number) =>
+    api.get<unknown, ApiResponse<CuratedStudyPath>>(`/study-paths/${id}`),
+};
+
 // ─── Quiz ────────────────────────────────────────────────────────────────────
 export const quizApi = {
   generate: (nodeIds: number[], count: number = 10) =>
@@ -217,7 +228,7 @@ export const materialsApi = {
 export const notesApi = {
   list: (params?: { nodeId?: number }) =>
     api.get<unknown, ApiResponse<Note[]>>("/notes", { params }),
-  create: (data: { nodeId: number; content: string; title?: string }) =>
+  create: (data: { nodeId?: number; content: string; title: string }) =>
     api.post<unknown, ApiResponse<Note>>("/notes", data),
   update: (id: number, data: { content: string; title?: string }) =>
     api.put<unknown, ApiResponse<Note>>(`/notes/${id}`, data),

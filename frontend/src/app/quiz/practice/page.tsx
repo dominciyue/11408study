@@ -2,7 +2,16 @@
 
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ClipboardCheck, ChevronLeft, ChevronRight, Sparkles, Timer as TimerIcon } from "lucide-react";
+import {
+  ClipboardCheck,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  Timer as TimerIcon,
+  ExternalLink,
+  CheckCircle2,
+  XCircle,
+} from "lucide-react";
 import { knowledgeApi, quizApi } from "@/lib/api";
 import type { KnowledgeNode, QuizQuestion } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,6 +84,8 @@ function QuizPracticeInner() {
 
   const q = questions[idx] || null;
   const options = useMemo(() => parseOptions(q?.options), [q?.options]);
+  // link-based 题：externalUrl 非空 → 不渲染 inline 选项，改为外链 + 自评
+  const isExternal = !!(q && q.externalUrl && q.externalUrl.trim().length > 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,6 +146,26 @@ function QuizPracticeInner() {
       if (userAnswer == null) return;
       submittingRef.current = true;
       try {
+        const res = await quizApi.submit({ questionId: q.id, userAnswer });
+        setResult(res.data);
+      } finally {
+        submittingRef.current = false;
+      }
+    },
+    [q]
+  );
+
+  // link-based 自评：✓ 提交 EXT_CORRECT、✗ 提交 EXT_WRONG。
+  // 后端 submitAnswer 比对 question.answer（种子约定 link-based 题 answer = "EXT_CORRECT"）。
+  const submitExternal = useCallback(
+    async (markCorrect: boolean) => {
+      if (!q) return;
+      if (submittingRef.current) return;
+      if (resultRef.current) return;
+      const userAnswer = markCorrect ? "EXT_CORRECT" : "EXT_WRONG";
+      submittingRef.current = true;
+      try {
+        setSelected(userAnswer);
         const res = await quizApi.submit({ questionId: q.id, userAnswer });
         setResult(res.data);
       } finally {
@@ -218,78 +249,146 @@ function QuizPracticeInner() {
           {q ? (
             <>
               <div className="text-gray-200 whitespace-pre-wrap">{q.content}</div>
-              <div className="grid gap-2">
-                {(options.length ? options : ["(无选项，直接填空作答)"]).map((opt) => (
+
+              {isExternal ? (
+                <>
+                  {/* link-based 题：来源 Badge */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {q.externalSource ? (
+                      <Badge className="bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        来自 {q.externalSource}
+                      </Badge>
+                    ) : null}
+                    {q.year != null ? (
+                      <Badge className="bg-slate-500/15 text-slate-300 border border-slate-500/30">
+                        {q.year} 年
+                      </Badge>
+                    ) : null}
+                    {q.questionNumber != null ? (
+                      <Badge className="bg-slate-500/15 text-slate-300 border border-slate-500/30">
+                        第 {q.questionNumber} 题
+                      </Badge>
+                    ) : null}
+                  </div>
+
+                  {/* 大按钮：跳转外部页 */}
                   <Button
-                    key={opt}
-                    variant="outline"
-                    className={
-                      selected === opt
-                        ? "border-blue-500/40 bg-blue-500/10 text-blue-200 justify-start"
-                        : "border-white/[0.08] hover:bg-white/10 text-gray-200 justify-start"
-                    }
-                    onClick={() => setSelected(opt)}
-                    disabled={!!result}
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-6 text-base"
+                    onClick={() => {
+                      if (q.externalUrl) window.open(q.externalUrl, "_blank", "noopener,noreferrer");
+                    }}
                   >
-                    {opt}
+                    去外部页面做题
+                    <ExternalLink className="w-4 h-4 ml-2" />
                   </Button>
-                ))}
-              </div>
 
-              <div className="flex gap-2">
-                <Button
-                  className="bg-blue-600 hover:bg-blue-700"
-                  disabled={!selected || !!result}
-                  onClick={() => submit(false)}
-                >
-                  提交
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-white/[0.08] text-gray-200"
-                  onClick={() => {
-                    setSelected(null);
-                    setResult(null);
-                  }}
-                  disabled={!!result}
-                >
-                  重选
-                </Button>
-              </div>
-
-              {result ? (
-                <div className="p-4 rounded-xl border border-white/[0.08] bg-white/5 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className={result.correct ? "text-green-400 font-medium" : "text-red-400 font-medium"}>
-                      {result.correct ? "回答正确" : "回答错误"}
+                  {/* 自评区 */}
+                  <div className="p-4 rounded-xl border border-white/[0.08] bg-white/5 space-y-3">
+                    <div className="text-sm text-gray-300">做完后请自评：</div>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={() => submitExternal(true)}
+                        disabled={!!result}
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                        我做对了
+                      </Button>
+                      <Button
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                        onClick={() => submitExternal(false)}
+                        disabled={!!result}
+                      >
+                        <XCircle className="w-4 h-4 mr-1.5" />
+                        我做错了
+                      </Button>
                     </div>
+                    {result ? (
+                      <div className="text-sm">
+                        <span className={result.correct ? "text-green-400" : "text-red-400"}>
+                          {result.correct ? "已记录：本题正确 " : "已记录：本题错误，已加入错题本"}
+                        </span>
+                        <span className="text-gray-400 ml-2">点击下方"下一题"继续。</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid gap-2">
+                    {(options.length ? options : ["(无选项，直接填空作答)"]).map((opt) => (
+                      <Button
+                        key={opt}
+                        variant="outline"
+                        className={
+                          selected === opt
+                            ? "border-blue-500/40 bg-blue-500/10 text-blue-200 justify-start"
+                            : "border-white/[0.08] hover:bg-white/10 text-gray-200 justify-start"
+                        }
+                        onClick={() => setSelected(opt)}
+                        disabled={!!result}
+                      >
+                        {opt}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2">
                     <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-blue-500/30 text-blue-300 hover:bg-blue-500/10"
-                      onClick={() => setAiOpen(true)}
-                      disabled={!q || !selected}
+                      className="bg-blue-600 hover:bg-blue-700"
+                      disabled={!selected || !!result}
+                      onClick={() => submit(false)}
                     >
-                      <Sparkles className="w-4 h-4 mr-1.5" />
-                      AI 启发式讲题
+                      提交
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="border-white/[0.08] text-gray-200"
+                      onClick={() => {
+                        setSelected(null);
+                        setResult(null);
+                      }}
+                      disabled={!!result}
+                    >
+                      重选
                     </Button>
                   </div>
-                  <div className="text-sm text-gray-300">正确答案：{result.correctAnswer}</div>
-                  {result.explanation ? (
-                    <div className="text-sm text-gray-400 whitespace-pre-wrap">{result.explanation}</div>
-                  ) : null}
-                </div>
-              ) : null}
 
-              {q && selected ? (
-                <AiExplainDialog
-                  open={aiOpen}
-                  onOpenChange={setAiOpen}
-                  questionId={q.id}
-                  userAnswer={selected}
-                  questionPreview={q.content}
-                />
-              ) : null}
+                  {result ? (
+                    <div className="p-4 rounded-xl border border-white/[0.08] bg-white/5 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className={result.correct ? "text-green-400 font-medium" : "text-red-400 font-medium"}>
+                          {result.correct ? "回答正确" : "回答错误"}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-blue-500/30 text-blue-300 hover:bg-blue-500/10"
+                          onClick={() => setAiOpen(true)}
+                          disabled={!q || !selected}
+                        >
+                          <Sparkles className="w-4 h-4 mr-1.5" />
+                          AI 启发式讲题
+                        </Button>
+                      </div>
+                      <div className="text-sm text-gray-300">正确答案：{result.correctAnswer}</div>
+                      {result.explanation ? (
+                        <div className="text-sm text-gray-400 whitespace-pre-wrap">{result.explanation}</div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {q && selected ? (
+                    <AiExplainDialog
+                      open={aiOpen}
+                      onOpenChange={setAiOpen}
+                      questionId={q.id}
+                      userAnswer={selected}
+                      questionPreview={q.content}
+                    />
+                  ) : null}
+                </>
+              )}
             </>
           ) : (
             <div className="text-gray-500">暂无题目（可能题库为空）。</div>

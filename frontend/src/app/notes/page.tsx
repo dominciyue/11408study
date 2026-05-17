@@ -32,11 +32,13 @@ import {
 import { notesApi } from "@/lib/api";
 import type { Note } from "@/types";
 
+type EditMode = { kind: "create" } | { kind: "edit"; note: Note };
+
 export default function NotesPage() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [editing, setEditing] = useState<Note | null>(null);
+  const [editing, setEditing] = useState<EditMode | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
   const [saving, setSaving] = useState(false);
@@ -63,17 +65,14 @@ export default function NotesPage() {
     return notes.filter((n) => (n.title + " " + n.content).toLowerCase().includes(q));
   }, [notes, query]);
 
-  async function createNote() {
-    const title = window.prompt("标题");
-    if (!title) return;
-    const content = window.prompt("内容");
-    if (!content) return;
-    const res = await notesApi.create({ nodeId: 1, title, content });
-    setNotes((prev) => [res.data, ...prev]);
+  function openCreate() {
+    setEditing({ kind: "create" });
+    setEditTitle("");
+    setEditContent("");
   }
 
   function openEdit(note: Note) {
-    setEditing(note);
+    setEditing({ kind: "edit", note });
     setEditTitle(note.title || "");
     setEditContent(note.content || "");
   }
@@ -82,11 +81,21 @@ export default function NotesPage() {
     if (!editing) return;
     setSaving(true);
     try {
-      const res = await notesApi.update(editing.id, {
-        title: editTitle,
-        content: editContent,
-      });
-      setNotes((prev) => prev.map((n) => (n.id === editing.id ? res.data : n)));
+      if (editing.kind === "create") {
+        const res = await notesApi.create({
+          title: editTitle,
+          content: editContent,
+        });
+        setNotes((prev) => [res.data, ...prev]);
+      } else {
+        const res = await notesApi.update(editing.note.id, {
+          title: editTitle,
+          content: editContent,
+        });
+        setNotes((prev) =>
+          prev.map((n) => (n.id === editing.note.id ? res.data : n))
+        );
+      }
       setEditing(null);
     } finally {
       setSaving(false);
@@ -109,7 +118,7 @@ export default function NotesPage() {
           </h1>
           <p className="text-gray-400 mt-1">记录学习心得，关联知识图谱</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={createNote}>
+        <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={openCreate}>
           <Plus className="w-4 h-4 mr-2" />
           新建笔记
         </Button>
@@ -206,7 +215,9 @@ export default function NotesPage() {
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent className="bg-[#0f0f17] border-white/[0.08] text-gray-200 sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-gray-100">编辑笔记</DialogTitle>
+            <DialogTitle className="text-gray-100">
+              {editing?.kind === "create" ? "新建笔记" : "编辑笔记"}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div>

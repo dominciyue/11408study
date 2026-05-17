@@ -147,6 +147,13 @@ export interface QuizQuestion {
   options?: string; // json string
   explanation?: string;
   answer?: string;
+
+  // ─── link-based 题目字段 (V11) ─────────────────────────────────────────────
+  // externalUrl 非空时，practice 页切换为"外链 + 自评"渲染
+  externalUrl?: string;
+  externalSource?: string;
+  year?: number;
+  questionNumber?: number;
 }
 
 export interface QuizSubmission {
@@ -277,4 +284,28 @@ export interface GraphFilter {
   topicId?: number;
   difficulty?: number;
   type?: string;
+}
+
+// ─── Curated Study Paths (V13) ─────────────────────────────────────────────
+export interface StudyPathWeekItem {
+  id: number;
+  weekNo: number;
+  title: string;
+  goal?: string;
+  dailyTasks: string[];
+  focusTopics: string[];
+  resourceHints: string[];
+}
+
+export interface CuratedStudyPath {
+  id: number;
+  code: string;
+  subjectId?: number;
+  title: string;
+  description?: string;
+  durationWeeks: number;
+  difficulty?: string;
+  targetAudience?: string;
+  totalHours?: number;
+  weeks?: StudyPathWeekItem[];  // 详情时填充
 }

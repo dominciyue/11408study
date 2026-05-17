@@ -3,6 +3,7 @@ package com.study11408.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.study11408.dto.QuizAiExplainRequest;
+import com.study11408.dto.QuizQuestionDTO;
 import com.study11408.dto.QuizSubmitRequest;
 import com.study11408.dto.WrongAnswerDTO;
 import com.study11408.entity.KnowledgeNode;
@@ -409,6 +410,30 @@ public class QuizService {
             log.warn("解析题目 options JSON 失败: {}", json, e);
             return List.of();
         }
+    }
+
+    /**
+     * QuizQuestion entity → DTO，用于需要把 link-based 字段独立出来的场景。
+     * 现有 controller 仍可直接返回 entity（@Data 自动 getter，Jackson 序列化字段名一致），
+     * 该方法供未来 controller 切换 / 单元测试使用。
+     */
+    public QuizQuestionDTO toQuizQuestionDTO(QuizQuestion q) {
+        if (q == null) return null;
+        QuizQuestionDTO dto = new QuizQuestionDTO();
+        dto.setId(q.getId());
+        dto.setNodeId(q.getNodeId());
+        dto.setQuestionType(q.getQuestionType());
+        dto.setContent(q.getContent());
+        dto.setOptions(q.getOptions());
+        dto.setAnswer(q.getAnswer());
+        dto.setExplanation(q.getExplanation());
+        dto.setSource(q.getSource());
+        dto.setExternalUrl(q.getExternalUrl());
+        dto.setExternalSource(q.getExternalSource());
+        dto.setYear(q.getYear());
+        dto.setQuestionNumber(q.getQuestionNumber());
+        dto.setCreatedAt(q.getCreatedAt());
+        return dto;
     }
 
     private WrongAnswerDTO toWrongAnswerDTO(WrongAnswer wrongAnswer) {

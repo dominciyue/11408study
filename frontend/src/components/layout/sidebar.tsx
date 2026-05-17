@@ -15,6 +15,7 @@ import {
   ChevronDown,
   ChevronRight,
   GraduationCap,
+  Route,
   Settings,
   LogOut,
 } from "lucide-react";
@@ -39,6 +40,7 @@ const navItems = [
 
 const bottomNavItems = [
   { name: "学习模式", href: "/study", icon: BookOpen },
+  { name: "专家路径", href: "/study/paths", icon: Route },
   { name: "测验", href: "/quiz", icon: ClipboardCheck },
   { name: "资料库", href: "/materials", icon: FolderOpen },
   { name: "笔记", href: "/notes", icon: StickyNote },

@@ -136,7 +136,7 @@ export default function DashboardPage() {
             <Card
               key={subject.code}
               className="border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-white/[0.02] hover:border-white/[0.16] transition-all duration-300 cursor-pointer"
-              onClick={() => router.push(`/subjects/${subject.code}`)}
+              onClick={() => router.push(`/subjects/${subject.subjectId}`)}
             >
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-4">

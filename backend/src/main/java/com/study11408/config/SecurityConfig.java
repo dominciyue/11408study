@@ -41,6 +41,8 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/v3/api-docs/**").permitAll()
                 .requestMatchers("/actuator/**").permitAll()
+                // 预置学习路径目录：游客也能浏览（登陆前首页/推荐区会拉，详情页直接深链可访问）
+                .requestMatchers("/study-paths/**").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

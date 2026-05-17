@@ -52,6 +52,20 @@ public class QuizQuestion {
     @Column(length = 50)
     private String source;
 
+    // ─── link-based question support (V11) ──────────────────────────────────
+    // 当 externalUrl 非空时，前端不渲染 4 个 inline 选项，转为"去外部页面 + 自评"模式。
+    @Column(name = "external_url", length = 1000)
+    private String externalUrl;
+
+    @Column(name = "external_source", length = 200)
+    private String externalSource;
+
+    @Column(name = "year")
+    private Integer year;
+
+    @Column(name = "question_number")
+    private Integer questionNumber;
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
