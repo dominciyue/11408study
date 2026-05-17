@@ -152,7 +152,14 @@ public class StudyPathService {
                 .easeFactor(2.5)
                 .intervalDays(0)
                 .build();
-        return progressRepository.save(fresh);
+        try {
+            return progressRepository.save(fresh);
+        } catch (org.springframework.dao.DataIntegrityViolationException race) {
+            // unique(user_id, node_id) race：另一并发请求同时新建。
+            // 回退到 find，确保幂等不抛 500。
+            return progressRepository.findByUserIdAndNodeId(userId, nodeId)
+                    .orElseThrow(() -> race);
+        }
     }
 
     /**

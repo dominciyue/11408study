@@ -52,7 +52,9 @@ public class ImportController {
         String title = raw.get("title") != null ? String.valueOf(raw.get("title")) : null;
         Integer totalPages = raw.get("total_pages") instanceof Number ? ((Number) raw.get("total_pages")).intValue() : null;
 
-        List<Map<String, Object>> chunksRaw = (List<Map<String, Object>>) raw.get("chunks");
+        // AI 返回 chunks 字段类型异常时直接 ClassCastException 500；先 instanceof 守门。
+        Object chunksObj = raw.get("chunks");
+        List<Map<String, Object>> chunksRaw = (chunksObj instanceof List<?>) ? (List<Map<String, Object>>) chunksObj : null;
         List<ImportPdfParseResponse.PdfChunkDTO> chunks = chunksRaw == null ? List.of() : chunksRaw.stream().map(c -> {
             String content = c.get("content") != null ? String.valueOf(c.get("content")) : "";
             Integer pageNumber = c.get("page_number") instanceof Number ? ((Number) c.get("page_number")).intValue() : null;
@@ -83,7 +85,8 @@ public class ImportController {
         }
 
         String rawText = raw.get("raw_text") != null ? String.valueOf(raw.get("raw_text")) : null;
-        List<Map<String, Object>> pointsRaw = (List<Map<String, Object>>) raw.get("knowledge_points");
+        Object pointsObj = raw.get("knowledge_points");
+        List<Map<String, Object>> pointsRaw = (pointsObj instanceof List<?>) ? (List<Map<String, Object>>) pointsObj : null;
         List<ImportKnowledgeExtractResponse.ExtractedKnowledgePointDTO> points = pointsRaw == null ? List.of() : pointsRaw.stream().map(p -> {
             String title = p.get("title") != null ? String.valueOf(p.get("title")) : "";
             String content = p.get("content") != null ? String.valueOf(p.get("content")) : "";

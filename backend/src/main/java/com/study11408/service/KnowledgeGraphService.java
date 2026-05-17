@@ -61,7 +61,14 @@ public class KnowledgeGraphService {
         KnowledgeNode node = nodeRepository.findById(nodeId)
                 .orElseThrow(() -> new BusinessException("知识节点不存在", HttpStatus.NOT_FOUND));
         String content = node.getContent() != null ? node.getContent() : "";
-        return aiClientService.enhanceContent(node.getTitle(), content, upperType);
+        Map<String, Object> resp = aiClientService.enhanceContent(node.getTitle(), content, upperType);
+        // AiClientService 错误兜底返 {error:...}；若 controller 直接透传，
+        // 前端把 "AI 服务暂不可用" 当成解读正文渲染。显式抛 502。
+        if (resp == null || resp.containsKey("error")) {
+            String err = resp == null ? "AI 无响应" : String.valueOf(resp.get("error"));
+            throw new BusinessException("AI 解读失败: " + err, HttpStatus.BAD_GATEWAY);
+        }
+        return resp;
     }
 
     @Transactional
@@ -158,10 +165,10 @@ public class KnowledgeGraphService {
         List<KnowledgeNode> nodes = nodeRepository.findByTopicSubjectId(subjectId);
         Set<Long> nodeIds = nodes.stream().map(KnowledgeNode::getId).collect(Collectors.toSet());
 
-        List<KnowledgeEdge> allEdges = new ArrayList<>();
-        for (Long nodeId : nodeIds) {
-            allEdges.addAll(edgeRepository.findBySourceIdOrTargetId(nodeId, nodeId));
-        }
+        // N+1 修复：之前 for nodeId 循环 357 次 SELECT，现在一次 IN 查询。
+        List<KnowledgeEdge> allEdges = nodeIds.isEmpty()
+                ? List.of()
+                : edgeRepository.findBySourceIdInOrTargetIdIn(nodeIds, nodeIds);
 
         List<KnowledgeEdge> filteredEdges = allEdges.stream()
                 .filter(e -> nodeIds.contains(e.getSourceId()) && nodeIds.contains(e.getTargetId()))
@@ -210,10 +217,10 @@ public class KnowledgeGraphService {
         }
 
         List<KnowledgeNode> nodes = nodeRepository.findAllById(visitedIds);
-        List<KnowledgeEdge> edges = new ArrayList<>();
-        for (Long id : visitedIds) {
-            edges.addAll(edgeRepository.findBySourceIdOrTargetId(id, id));
-        }
+        // 同 getGraphData N+1 修复
+        List<KnowledgeEdge> edges = visitedIds.isEmpty()
+                ? List.of()
+                : edgeRepository.findBySourceIdInOrTargetIdIn(visitedIds, visitedIds);
 
         List<KnowledgeEdge> filteredEdges = edges.stream()
                 .filter(e -> visitedIds.contains(e.getSourceId()) && visitedIds.contains(e.getTargetId()))

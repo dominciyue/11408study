@@ -71,7 +71,10 @@ public class KnowledgeController {
         return ApiResponse.ok(knowledgeGraphService.getEdgesByNodeId(nodeId));
     }
 
-    @Operation(summary = "创建知识关系")
+    @Operation(summary = "创建知识关系（仅管理员）",
+            description = "新增节点 POST /knowledge/nodes 保留全员可用（材料导入需要建节点）；"
+                    + "但边影响所有人看到的图谱结构，限管理员。")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/edges")
     public ApiResponse<KnowledgeEdgeDTO> createEdge(@Valid @RequestBody CreateEdgeRequest request) {
         return ApiResponse.ok(knowledgeGraphService.createEdge(request));

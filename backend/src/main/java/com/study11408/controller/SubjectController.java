@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,13 +32,15 @@ public class SubjectController {
         return ApiResponse.ok(subjectService.getSubjectById(id));
     }
 
-    @Operation(summary = "创建科目")
+    @Operation(summary = "创建科目（仅管理员）")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping
     public ApiResponse<SubjectDTO> createSubject(@Valid @RequestBody SubjectDTO dto) {
         return ApiResponse.ok(subjectService.createSubject(dto));
     }
 
-    @Operation(summary = "更新科目")
+    @Operation(summary = "更新科目（仅管理员）")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ApiResponse<SubjectDTO> updateSubject(@PathVariable Long id, @Valid @RequestBody SubjectDTO dto) {
         return ApiResponse.ok(subjectService.updateSubject(id, dto));

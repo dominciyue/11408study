@@ -277,18 +277,26 @@ public class StatsService {
                         w -> w.getQuestion().getNodeId(),
                         Collectors.counting()));
 
-        List<Map<String, Object>> weakNodes = wrongCountByNode.entrySet().stream()
+        // N+1 修复：先选出 top 10 弱节点 id，再一次 IN 查所有相关节点。
+        List<Map.Entry<Long, Long>> topWrong = wrongCountByNode.entrySet().stream()
                 .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
                 .limit(10)
+                .toList();
+        List<Long> topWrongIds = topWrong.stream().map(Map.Entry::getKey).toList();
+        Map<Long, com.study11408.entity.KnowledgeNode> nodeById = nodeRepository
+                .findAllById(topWrongIds).stream()
+                .collect(Collectors.toMap(com.study11408.entity.KnowledgeNode::getId, n -> n, (a, b) -> a));
+
+        List<Map<String, Object>> weakNodes = topWrong.stream()
                 .map(entry -> {
                     Map<String, Object> item = new HashMap<>();
                     item.put("nodeId", entry.getKey());
                     item.put("wrongCount", entry.getValue());
-                    nodeRepository.findById(entry.getKey())
-                            .ifPresent(node -> {
-                                item.put("nodeTitle", node.getTitle());
-                                item.put("topicName", node.getTopic() != null ? node.getTopic().getName() : null);
-                            });
+                    com.study11408.entity.KnowledgeNode node = nodeById.get(entry.getKey());
+                    if (node != null) {
+                        item.put("nodeTitle", node.getTitle());
+                        item.put("topicName", node.getTopic() != null ? node.getTopic().getName() : null);
+                    }
                     return item;
                 })
                 .collect(Collectors.toList());

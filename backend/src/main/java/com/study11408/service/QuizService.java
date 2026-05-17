@@ -317,7 +317,8 @@ public class QuizService {
         QuizQuestion question = questionRepository.findById(request.getQuestionId())
                 .orElseThrow(() -> new BusinessException("题目不存在", HttpStatus.NOT_FOUND));
 
-        boolean correct = question.getAnswer().equals(request.getUserAnswer());
+        // 用 Objects.equals 避免 question.answer 为 null 时 NPE 500
+        boolean correct = java.util.Objects.equals(question.getAnswer(), request.getUserAnswer());
 
         Map<String, Object> result = new HashMap<>();
         result.put("correct", correct);
