@@ -17,9 +17,13 @@ spring:
     hibernate:
       ddl-auto: validate
     show-sql: true
+    # 多处 service 在 DTO 映射时依赖 lazy load（getGraphData/getStudyPath/
+    # Topic/Note 等），关闭 open-in-view 会触发 5+ 个 500。显式声明 true 消除
+    # JpaBaseConfiguration 的默认警告；未来引入 DTO projection 后可改 false。
+    open-in-view: true
+    # 显式 dialect 已移除（驱动 auto-detect），消除 HHH90000025 警告。
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
   flyway:

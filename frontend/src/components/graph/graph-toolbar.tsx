@@ -3,12 +3,10 @@
 import React from "react";
 import {
   Search,
-  Filter,
   ZoomIn,
   ZoomOut,
   Maximize2,
   RotateCcw,
-  Star,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,8 +20,6 @@ export type MasteryFilter = null | 0 | 1 | 2 | 3 | 4 | 5;
 interface GraphToolbarProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  activeSubject: string | null;
-  onSubjectFilter: (subject: string | null) => void;
   masteryFilter?: MasteryFilter;
   onMasteryFilter?: (filter: MasteryFilter) => void;
   onZoomIn: () => void;
@@ -33,13 +29,6 @@ interface GraphToolbarProps {
   nodeCount: number;
   edgeCount: number;
 }
-
-const subjects = [
-  { code: "ds", name: "数据结构", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
-  { code: "co", name: "组成原理", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
-  { code: "os", name: "操作系统", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
-  { code: "cn", name: "计算机网络", color: "bg-purple-500/20 text-purple-400 border-purple-500/30" },
-];
 
 const MASTERY_OPTIONS: { value: MasteryFilter; label: string }[] = [
   { value: null, label: "全部" },
@@ -54,8 +43,6 @@ const MASTERY_OPTIONS: { value: MasteryFilter; label: string }[] = [
 export function GraphToolbar({
   searchQuery,
   onSearchChange,
-  activeSubject,
-  onSubjectFilter,
   masteryFilter = null,
   onMasteryFilter,
   onZoomIn,
@@ -79,32 +66,8 @@ export function GraphToolbar({
           />
         </div>
 
-        {/* Subject filters */}
-        <div className="flex items-center gap-1.5 pointer-events-auto">
-          <Button
-            variant="outline"
-            size="sm"
-            className={`text-xs border-white/[0.08] bg-[#111118]/90 backdrop-blur-md ${
-              activeSubject === null ? "text-blue-400 border-blue-500/30" : "text-gray-400"
-            }`}
-            onClick={() => onSubjectFilter(null)}
-          >
-            全部
-          </Button>
-          {subjects.map((s) => (
-            <Button
-              key={s.code}
-              variant="outline"
-              size="sm"
-              className={`text-xs bg-[#111118]/90 backdrop-blur-md ${
-                activeSubject === s.code ? s.color : "border-white/[0.08] text-gray-500"
-              }`}
-              onClick={() => onSubjectFilter(activeSubject === s.code ? null : s.code)}
-            >
-              {s.name}
-            </Button>
-          ))}
-        </div>
+        {/* Subject 子主题筛选：原硬编码 ds/co/os/cn 仅 408 适用，现已移除；
+            学科切换由 /subjects 入口或 URL ?subjectId= 控制。 */}
 
         {/* Mastery filter */}
         {onMasteryFilter ? (

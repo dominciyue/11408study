@@ -203,7 +203,6 @@ function GraphPageInner() {
 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeSubject, setActiveSubject] = useState<string | null>(null);
   const [masteryFilter, setMasteryFilter] = useState<MasteryFilter>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -281,8 +280,9 @@ function GraphPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusNodeId, nodes.length]);
 
-  // masteryFilter + topicId 联合作用：不匹配的 dimmed
+  // masteryFilter + topicId + searchQuery 联合作用：不匹配的 dimmed
   useEffect(() => {
+    const q = searchQuery.trim().toLowerCase();
     setNodes((nds) =>
       nds.map((n) => {
         const m =
@@ -294,7 +294,9 @@ function GraphPageInner() {
         const nodeTopicId =
           typeof rawTopicId === "number" ? rawTopicId : undefined;
         const topicMatch = hasValidTopic ? nodeTopicId === topicId : true;
-        const matches = masteryMatch && topicMatch;
+        const label = String(n.data.label || "").toLowerCase();
+        const searchMatch = q === "" || label.includes(q);
+        const matches = masteryMatch && topicMatch && searchMatch;
         return {
           ...n,
           data: { ...n.data, dimmed: !matches },
@@ -303,7 +305,7 @@ function GraphPageInner() {
     );
     // 注意：这里依赖 rawNodes 而非 nodes，避免 setNodes 引起的无限循环
     // setNodes 不会触发本 effect 重跑（它来自 useNodesState）
-  }, [masteryFilter, topicId, hasValidTopic, setNodes, rawNodes]);
+  }, [masteryFilter, topicId, hasValidTopic, searchQuery, setNodes, rawNodes]);
 
   const selectedNode = useMemo(() => {
     if (!selectedNodeId) return null;
@@ -395,8 +397,6 @@ function GraphPageInner() {
         <GraphToolbar
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
-          activeSubject={activeSubject}
-          onSubjectFilter={setActiveSubject}
           masteryFilter={masteryFilter}
           onMasteryFilter={setMasteryFilter}
           onZoomIn={handleZoomIn}

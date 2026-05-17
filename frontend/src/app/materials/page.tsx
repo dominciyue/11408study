@@ -37,11 +37,13 @@ const SUBJECT_OPTIONS: Array<{ id: number | null; label: string }> = [
   { id: 4, label: "408" },
 ];
 
+// 标签 → 后端 resolveTypePrefix 做 MIME 前缀映射（PDF/IMAGE/VIDEO/DOC/DOCX/TEXT）
 const TYPE_OPTIONS: Array<{ value: string | null; label: string }> = [
   { value: null, label: "全部" },
   { value: "PDF", label: "PDF" },
   { value: "IMAGE", label: "图片" },
-  { value: "NOTE", label: "笔记" },
+  { value: "VIDEO", label: "视频" },
+  { value: "DOC", label: "Word" },
 ];
 
 export default function MaterialsPage() {

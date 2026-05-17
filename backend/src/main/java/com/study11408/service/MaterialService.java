@@ -99,13 +99,30 @@ public class MaterialService {
         return materialRepository.findAll();
     }
 
-    /** 按学科 / type 筛选；type 走内存过滤（前缀匹配，忽略大小写）。 */
+    /** 前端 chip 标签 → MIME 前缀；非 alias 字符串按原样前缀匹配。 */
+    private static String resolveTypePrefix(String type) {
+        if (type == null) return null;
+        String t = type.trim();
+        if (t.isEmpty()) return null;
+        String upper = t.toUpperCase();
+        switch (upper) {
+            case "PDF": return "application/pdf";
+            case "IMAGE": return "image/";
+            case "VIDEO": return "video/";
+            case "DOC": return "application/msword";
+            case "DOCX": return "application/vnd.openxmlformats-officedocument.wordprocessingml";
+            case "TEXT": return "text/";
+            default: return t.toLowerCase();
+        }
+    }
+
+    /** 按学科 / type 筛选；type 标签先 alias 映射 MIME 前缀，再前缀匹配（忽略大小写）。 */
     public List<Material> searchMaterials(Long subjectId, String type) {
         List<Material> base = subjectId != null
                 ? materialRepository.findBySubjectId(subjectId)
                 : materialRepository.findAll();
-        if (type == null || type.isBlank()) return base;
-        String prefix = type.toLowerCase();
+        String prefix = resolveTypePrefix(type);
+        if (prefix == null) return base;
         return base.stream()
                 .filter(m -> m.getType() != null && m.getType().toLowerCase().startsWith(prefix))
                 .toList();

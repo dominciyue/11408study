@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { quizApi, statsApi } from "@/lib/api";
 import type { WrongAnswer, StatsOverview } from "@/types";
+import AiExplainDialog from "@/components/quiz/ai-explain-dialog";
 
 const SUBJECTS: { id: number; name: string; color: string }[] = [
   { id: 1, name: "政治", color: "bg-red-500/20 text-red-300 border-red-500/30" },
@@ -77,6 +78,7 @@ export default function QuizPage() {
   const [wrongAnswers, setWrongAnswers] = useState<WrongAnswer[] | null>(null);
   const [overview, setOverview] = useState<StatsOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [askingFor, setAskingFor] = useState<WrongAnswer | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -252,7 +254,7 @@ export default function QuizPage() {
                       size="sm"
                       variant="outline"
                       className="border-blue-500/30 text-blue-300 hover:bg-blue-500/10"
-                      onClick={() => router.push("/quiz/wrong")}
+                      onClick={() => setAskingFor(w)}
                     >
                       <Sparkles className="w-3.5 h-3.5 mr-1.5" />
                       AI 讲解
@@ -264,6 +266,18 @@ export default function QuizPage() {
           )}
         </div>
       </div>
+
+      {askingFor ? (
+        <AiExplainDialog
+          open={!!askingFor}
+          onOpenChange={(open) => {
+            if (!open) setAskingFor(null);
+          }}
+          questionId={askingFor.questionId}
+          userAnswer={askingFor.userAnswer}
+          questionPreview={askingFor.questionText}
+        />
+      ) : null}
     </div>
   );
 }
