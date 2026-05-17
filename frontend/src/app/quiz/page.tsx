@@ -117,7 +117,7 @@ export default function QuizPage() {
 
   function handleModeClick(key: (typeof quizModes)[number]["key"]) {
     if (key === "adaptive") router.push("/quiz/practice?adaptive=1");
-    else if (key === "timed") router.push("/quiz/practice?timed=1&subjectId=4");
+    else if (key === "timed") router.push("/quiz/practice?timed=1&adaptive=1");
     else if (key === "wrong") router.push("/quiz/wrong");
     // "subject" 模式由内部 chips 处理，外层不动作
   }

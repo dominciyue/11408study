@@ -1,9 +1,11 @@
 package com.study11408.controller;
 
 import com.study11408.dto.*;
+import com.study11408.security.JwtTokenProvider;
 import com.study11408.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +19,7 @@ import java.util.Map;
 public class AuthController {
 
     private final AuthService authService;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Operation(summary = "用户注册")
     @PostMapping("/register")
@@ -35,5 +38,13 @@ public class AuthController {
     public ApiResponse<AuthResponse> refresh(@RequestBody Map<String, String> request) {
         String refreshToken = request.get("refreshToken");
         return ApiResponse.ok(authService.refreshToken(refreshToken));
+    }
+
+    @Operation(summary = "获取当前登录用户")
+    @GetMapping("/me")
+    public ApiResponse<UserDTO> me(HttpServletRequest request) {
+        String token = jwtTokenProvider.resolveToken(request);
+        Long userId = jwtTokenProvider.getUserId(token);
+        return ApiResponse.ok(authService.getCurrentUser(userId));
     }
 }

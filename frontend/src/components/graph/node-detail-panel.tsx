@@ -269,10 +269,10 @@ export function NodeDetailPanel({ node, relatedNodes, sources, onClose, onNodeCl
                 if (aiEnabled) {
                   router.push(`/quiz/practice?nodeId=${numericNodeId}`);
                 } else {
-                  router.push("/quiz/practice?subjectId=4");
+                  router.push("/quiz/practice?adaptive=1");
                 }
               }}
-              title={aiEnabled ? "做本知识点的题" : "节点 id 无效，进入 408 学科练习"}
+              title={aiEnabled ? "做本知识点的题" : "节点 id 无效，进入自适应练习"}
             >
               <BookOpen className="w-4 h-4 mr-2" />
               开始学习

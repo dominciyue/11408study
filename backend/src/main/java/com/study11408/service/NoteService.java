@@ -85,9 +85,12 @@ public class NoteService {
 
     private NoteDTO toDTO(Note note) {
         KnowledgeNode node = note.getNode();
+        // node_id 列 insertable=false → 新建后 entity 内存中字段尚未刷新；
+        // 优先从 ManyToOne 关联取真实 id，fallback 到 read-only 字段。
+        Long resolvedNodeId = node != null ? node.getId() : note.getNodeId();
         return NoteDTO.builder()
                 .id(note.getId())
-                .nodeId(note.getNodeId())
+                .nodeId(resolvedNodeId)
                 .nodeTitle(node != null ? node.getTitle() : null)
                 .topicName(node != null && node.getTopic() != null ? node.getTopic().getName() : null)
                 .subjectName(node != null && node.getTopic() != null && node.getTopic().getSubject() != null

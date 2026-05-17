@@ -88,6 +88,12 @@ public class AuthService {
                 .build();
     }
 
+    public UserDTO getCurrentUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("用户不存在", HttpStatus.NOT_FOUND));
+        return toUserDTO(user);
+    }
+
     private UserDTO toUserDTO(User user) {
         return UserDTO.builder()
                 .id(user.getId())

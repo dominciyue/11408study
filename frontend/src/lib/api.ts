@@ -98,8 +98,10 @@ export const knowledgeApi = {
     api.post<unknown, ApiResponse<KnowledgeNode>>("/knowledge/nodes", data),
   createEdge: (data: { sourceId: number; targetId: number; relationType: string; weight?: number; description?: string }) =>
     api.post<unknown, ApiResponse<KnowledgeEdge>>("/knowledge/edges", data),
-  getEdges: (params?: { subjectId?: number }) =>
-    api.get<unknown, ApiResponse<KnowledgeEdge[]>>("/knowledge/edges", { params }),
+  // 注意：后端 /knowledge/edges 需要 nodeId 必填，返回该节点关联的边。
+  // 学科级图谱（节点 + 边）请用 getGraphData(subjectId)。
+  getEdgesByNode: (nodeId: number) =>
+    api.get<unknown, ApiResponse<KnowledgeEdge[]>>("/knowledge/edges", { params: { nodeId } }),
   getGraphData: (params: { subjectId: number; topicId?: number }) =>
     api.get<unknown, ApiResponse<GraphData>>(
       `/knowledge/graph/${params.subjectId}`,

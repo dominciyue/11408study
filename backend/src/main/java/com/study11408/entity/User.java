@@ -1,5 +1,6 @@
 package com.study11408.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -25,6 +26,9 @@ public class User {
     @Column(unique = true, nullable = false, length = 100)
     private String email;
 
+    // 安全：bcrypt hash 绝不能出现在任何 JSON 响应里。任何 entity 关联 User
+    // (StudySession.user / WrongAnswer.user / Note.user 等) 直接序列化时也受此保护。
+    @JsonIgnore
     @Column(nullable = false)
     private String password;
 

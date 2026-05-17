@@ -37,7 +37,8 @@ public class SecurityConfig {
                 .authenticationEntryPoint(unauthorizedEntryPoint())
             )
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/auth/**").permitAll()
+                // 仅 login / register / refresh 公开；/me 必须带 JWT
+                .requestMatchers("/auth/login", "/auth/register", "/auth/refresh").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/v3/api-docs/**").permitAll()
                 .requestMatchers("/actuator/**").permitAll()

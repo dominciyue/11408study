@@ -27,6 +27,12 @@ public class TopicService {
                 .collect(Collectors.toList());
     }
 
+    public TopicDTO getTopic(Long id) {
+        Topic topic = topicRepository.findById(id)
+                .orElseThrow(() -> new BusinessException("主题不存在", HttpStatus.NOT_FOUND));
+        return toDTO(topic);
+    }
+
     @Transactional
     public TopicDTO createTopic(TopicDTO dto) {
         Subject subject = subjectRepository.findById(dto.getSubjectId())

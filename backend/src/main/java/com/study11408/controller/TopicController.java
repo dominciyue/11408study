@@ -24,6 +24,12 @@ public class TopicController {
         return ApiResponse.ok(topicService.getTopicsBySubject(subjectId));
     }
 
+    @Operation(summary = "获取单个主题详情")
+    @GetMapping("/topics/{id}")
+    public ApiResponse<TopicDTO> getTopic(@PathVariable Long id) {
+        return ApiResponse.ok(topicService.getTopic(id));
+    }
+
     @Operation(summary = "创建主题")
     @PostMapping("/topics")
     public ApiResponse<TopicDTO> createTopic(@Valid @RequestBody TopicDTO dto) {
