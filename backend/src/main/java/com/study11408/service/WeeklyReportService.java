@@ -64,20 +64,39 @@ public class WeeklyReportService {
                 .mapToLong(s -> Duration.between(s.getStartTime(), s.getEndTime()).toMinutes())
                 .sum();
 
-        long studiedNodesThisWeek = windowSessions.stream()
-                .mapToLong(s -> s.getStudiedNodes() == null ? 0 : s.getStudiedNodes())
-                .sum();
+        // 与 StatsService 同：StudySession.studiedNodes 列没人递增 → 永远 0。
+        // 改用 StudyProgress.lastReview 在窗口内的去重节点数。
+        long studiedNodesThisWeek = progressList.stream()
+                .filter(p -> p.getLastReview() != null)
+                .filter(p -> {
+                    LocalDate d = p.getLastReview().toLocalDate();
+                    return !d.isBefore(windowStart) && !d.isAfter(today);
+                })
+                .filter(p -> p.getRepetitionCount() != null && p.getRepetitionCount() <= 1)
+                .count();
 
-        long reviewedNodesThisWeek = windowSessions.stream()
-                .mapToLong(s -> s.getReviewedNodes() == null ? 0 : s.getReviewedNodes())
-                .sum();
+        long reviewedNodesThisWeek = progressList.stream()
+                .filter(p -> p.getLastReview() != null)
+                .filter(p -> {
+                    LocalDate d = p.getLastReview().toLocalDate();
+                    return !d.isBefore(windowStart) && !d.isAfter(today);
+                })
+                .filter(p -> p.getRepetitionCount() != null && p.getRepetitionCount() > 1)
+                .count();
 
         Map<LocalDate, List<StudySession>> windowByDay = windowSessions.stream()
                 .collect(Collectors.groupingBy(s -> s.getStartTime().toLocalDate()));
 
-        int daysActive = (int) windowByDay.entrySet().stream()
-                .filter(e -> hasAnyActivity(e.getValue()))
-                .count();
+        // 任何窗口内 lastReview 也算活跃，否则 feedback-only 用户 daysActive=0
+        java.util.Set<LocalDate> reviewDaysInWindow = progressList.stream()
+                .filter(p -> p.getLastReview() != null)
+                .map(p -> p.getLastReview().toLocalDate())
+                .filter(d -> !d.isBefore(windowStart) && !d.isAfter(today))
+                .collect(Collectors.toSet());
+
+        java.util.Set<LocalDate> activeDays = new java.util.HashSet<>(reviewDaysInWindow);
+        windowByDay.forEach((d, s) -> { if (hasAnyActivity(s)) activeDays.add(d); });
+        int daysActive = activeDays.size();
 
         // dailyMinutes 长度恒为 7，下标 0 = windowStart，下标 6 = today
         List<Long> dailyMinutes = new ArrayList<>(WINDOW_DAYS);
@@ -90,8 +109,12 @@ public class WeeklyReportService {
             dailyMinutes.add(minutes);
         }
 
-        // ─── streak（与 StatsService.getOverviewV2 同算法，本地内联避免污染既有 service）
-        int streakDays = computeStreakDays(sessions, today);
+        // ─── streak: session + 任何 lastReview 都算"学过"
+        java.util.Set<LocalDate> allReviewDays = progressList.stream()
+                .filter(p -> p.getLastReview() != null)
+                .map(p -> p.getLastReview().toLocalDate())
+                .collect(Collectors.toSet());
+        int streakDays = computeStreakDays(sessions, allReviewDays, today);
 
         // ─── 弱主题 top 5
         List<String> topWeakTopics = computeTopWeakTopics(progressList);
@@ -136,7 +159,7 @@ public class WeeklyReportService {
      * <p>从今天开始向前数：当天有任何 session（endTime 非空且分钟&gt;0，或 studied/reviewed&gt;0）则算"学习了"；
      * 一旦遇到没学的天数就 break。最大回溯 365 天。
      */
-    static int computeStreakDays(List<StudySession> sessions, LocalDate today) {
+    static int computeStreakDays(List<StudySession> sessions, java.util.Set<LocalDate> reviewDays, LocalDate today) {
         Map<LocalDate, List<StudySession>> sessionsByDay = sessions.stream()
                 .filter(s -> s.getStartTime() != null)
                 .collect(Collectors.groupingBy(s -> s.getStartTime().toLocalDate()));
@@ -145,7 +168,7 @@ public class WeeklyReportService {
         for (int i = 0; i < 365; i++) {
             LocalDate day = today.minusDays(i);
             List<StudySession> daySessions = sessionsByDay.getOrDefault(day, Collections.emptyList());
-            if (!hasAnyActivity(daySessions)) break;
+            if (!reviewDays.contains(day) && !hasAnyActivity(daySessions)) break;
             streak++;
         }
         return streak;
