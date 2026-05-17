@@ -69,14 +69,16 @@ public class QuizService {
     @Transactional
     public Map<String, Object> generateAndSaveForNode(
             Long nodeId, int count, String questionType, String difficulty) {
+        // 入参校验抛 400，区别于运行时失败（AI 无响应等）的 success+error 软失败。
         if (count <= 0) {
-            return Map.of("generated", 0, "error", "count 必须 > 0");
+            throw new BusinessException("count 必须 > 0", HttpStatus.BAD_REQUEST);
         }
         if (count > 20) count = 20;  // ai-service 上限即 20
         String type = (questionType == null ? "CHOICE" : questionType.toUpperCase());
         if (!ALLOWED_QUIZ_TYPES.contains(type)) {
-            return Map.of("generated", 0,
-                    "error", "questionType 必须是 CHOICE / TRUE_FALSE / FILL_BLANK");
+            throw new BusinessException(
+                    "questionType 必须是 CHOICE / TRUE_FALSE / FILL_BLANK",
+                    HttpStatus.BAD_REQUEST);
         }
 
         KnowledgeNode node = nodeRepository.findById(nodeId)
