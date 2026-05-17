@@ -116,10 +116,12 @@ function QuizPracticeInner() {
             // 静默降级
           }
           if (questionsData.length === 0 && subjectId != null) {
-            const nodesRes = await knowledgeApi.getNodes({ subjectId });
-            const nodeIds = nodesRes.data.slice(0, 20).map((n: KnowledgeNode) => n.id);
-            const quizRes = await quizApi.generate(nodeIds, 10);
-            questionsData = quizRes.data;
+            const nodesRes = await knowledgeApi.getNodes({ subjectId, size: 20 });
+            const nodeIds = (nodesRes.data.content ?? []).map((n: KnowledgeNode) => n.id);
+            if (nodeIds.length > 0) {
+              const quizRes = await quizApi.generate(nodeIds, 10);
+              questionsData = quizRes.data;
+            }
           }
         }
         if (!cancelled) {

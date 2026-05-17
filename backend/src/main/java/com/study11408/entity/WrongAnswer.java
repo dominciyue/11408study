@@ -1,5 +1,6 @@
 package com.study11408.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -20,6 +21,7 @@ public class WrongAnswer {
     @Column(name = "user_id", insertable = false, updatable = false)
     private Long userId;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -27,6 +29,7 @@ public class WrongAnswer {
     @Column(name = "question_id", insertable = false, updatable = false)
     private Long questionId;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_id", nullable = false)
     private QuizQuestion question;

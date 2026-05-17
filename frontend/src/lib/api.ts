@@ -1,6 +1,7 @@
 import axios from "axios";
 import type {
   ApiResponse,
+  PageResponse,
   AuthResponse,
   LoginRequest,
   RegisterRequest,
@@ -90,8 +91,10 @@ export const knowledgeApi = {
       null,
       { params: { type }, timeout: 90000 } // LLM 详解通常 5-30s
     ),
-  getNodes: (params?: { subjectId?: number; topicId?: number; difficulty?: number }) =>
-    api.get<unknown, ApiResponse<KnowledgeNode[]>>("/knowledge/nodes", { params }),
+  /** 后端 GET /knowledge/nodes 返回 Spring Page<T>。
+   *  之前误当数组直接 .slice() 会 undefined.slice is not a function。 */
+  getNodes: (params?: { subjectId?: number; topicId?: number; keyword?: string; page?: number; size?: number }) =>
+    api.get<unknown, ApiResponse<PageResponse<KnowledgeNode>>>("/knowledge/nodes", { params }),
   getNode: (id: number) =>
     api.get<unknown, ApiResponse<KnowledgeNode>>(`/knowledge/nodes/${id}`),
   createNode: (data: { title: string; content: string; difficulty?: number; topicId: number; metadata?: Record<string, unknown> }) =>

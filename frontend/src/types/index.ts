@@ -5,6 +5,19 @@ export interface ApiResponse<T> {
   data: T;
 }
 
+/** Spring Page<T> 序列化形态。任何后端返回 Page 的接口都用这个类型，避免误当数组 .slice()。 */
+export interface PageResponse<T> {
+  content: T[];
+  totalElements: number;
+  totalPages: number;
+  number: number;
+  size: number;
+  first: boolean;
+  last: boolean;
+  numberOfElements: number;
+  empty: boolean;
+}
+
 // ─── Auth ────────────────────────────────────────────────────────────────────
 export interface LoginRequest {
   username: string;

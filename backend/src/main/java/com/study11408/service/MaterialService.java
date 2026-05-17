@@ -99,10 +99,33 @@ public class MaterialService {
         return materialRepository.findAll();
     }
 
+    /** 按学科 / type 筛选；type 走内存过滤（前缀匹配，忽略大小写）。 */
+    public List<Material> searchMaterials(Long subjectId, String type) {
+        List<Material> base = subjectId != null
+                ? materialRepository.findBySubjectId(subjectId)
+                : materialRepository.findAll();
+        if (type == null || type.isBlank()) return base;
+        String prefix = type.toLowerCase();
+        return base.stream()
+                .filter(m -> m.getType() != null && m.getType().toLowerCase().startsWith(prefix))
+                .toList();
+    }
+
+    /** ownership 校验：仅上传者本人或管理员可删；普通用户删别人的资料 → 403。 */
     @Transactional
-    public void deleteMaterial(Long id) {
+    public void deleteMaterial(Long id, Long currentUserId) {
         Material material = materialRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("资料不存在", HttpStatus.NOT_FOUND));
+
+        Long uploaderId = material.getUploader() != null
+                ? material.getUploader().getId() : material.getUploaderId();
+        if (uploaderId == null || !uploaderId.equals(currentUserId)) {
+            // 允许管理员删（admin role）；非管理员且非上传者一律拒绝。
+            User u = userRepository.findById(currentUserId).orElse(null);
+            if (u == null || !"ADMIN".equalsIgnoreCase(u.getRole())) {
+                throw new BusinessException("无权删除该资料", HttpStatus.FORBIDDEN);
+            }
+        }
 
         try {
             String fileUrl = material.getFileUrl();

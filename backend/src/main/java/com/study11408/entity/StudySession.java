@@ -1,5 +1,6 @@
 package com.study11408.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -20,6 +21,9 @@ public class StudySession {
     @Column(name = "user_id", insertable = false, updatable = false)
     private Long userId;
 
+    // 同 QuizQuestion / StudyProgress：lazy proxy 直出会让 Jackson 找不到
+    // hibernateLazyInitializer 序列化器 → PUT /end 500。前端只需 userId/subjectId。
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
@@ -27,6 +31,7 @@ public class StudySession {
     @Column(name = "subject_id", insertable = false, updatable = false)
     private Long subjectId;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subject_id")
     private Subject subject;

@@ -33,20 +33,24 @@ public class MaterialController {
         return ApiResponse.ok(materialService.uploadMaterial(file, title, nodeId, userId));
     }
 
-    @Operation(summary = "获取资料列表")
+    @Operation(summary = "获取资料列表",
+            description = "nodeId 优先；否则按 subjectId/type 联合筛选，均为空时返回全部。")
     @GetMapping
     public ApiResponse<List<Material>> getMaterials(
-            @RequestParam(required = false) Long nodeId) {
+            @RequestParam(required = false) Long nodeId,
+            @RequestParam(required = false) Long subjectId,
+            @RequestParam(required = false) String type) {
         if (nodeId != null) {
             return ApiResponse.ok(materialService.getMaterialsByNodeId(nodeId));
         }
-        return ApiResponse.ok(materialService.getAllMaterials());
+        return ApiResponse.ok(materialService.searchMaterials(subjectId, type));
     }
 
-    @Operation(summary = "删除资料")
+    @Operation(summary = "删除资料（仅上传者或管理员）")
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> delete(@PathVariable Long id) {
-        materialService.deleteMaterial(id);
+    public ApiResponse<Void> delete(HttpServletRequest request, @PathVariable Long id) {
+        Long userId = getUserId(request);
+        materialService.deleteMaterial(id, userId);
         return ApiResponse.ok();
     }
 
