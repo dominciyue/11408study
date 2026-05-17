@@ -2,8 +2,17 @@ server:
   port: 8080
   servlet:
     context-path: /api
+    # multipart 上传上限对齐 nginx client_max_body_size 100M，
+    # 否则 PDF >10MB（Spring 默认）即被 Tomcat 拒，前端报 500
+    encoding:
+      charset: UTF-8
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
   datasource:
     url: jdbc:postgresql://localhost:5432/study11408
     username: study11408

@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -49,13 +50,15 @@ public class KnowledgeController {
         return ApiResponse.ok(knowledgeGraphService.createNode(request));
     }
 
-    @Operation(summary = "更新知识节点")
+    @Operation(summary = "更新知识节点（仅管理员）")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/nodes/{id}")
     public ApiResponse<KnowledgeNodeDTO> updateNode(@PathVariable Long id, @Valid @RequestBody CreateNodeRequest request) {
         return ApiResponse.ok(knowledgeGraphService.updateNode(id, request));
     }
 
-    @Operation(summary = "删除知识节点")
+    @Operation(summary = "删除知识节点（仅管理员）")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/nodes/{id}")
     public ApiResponse<Void> deleteNode(@PathVariable Long id) {
         knowledgeGraphService.deleteNode(id);
@@ -74,7 +77,8 @@ public class KnowledgeController {
         return ApiResponse.ok(knowledgeGraphService.createEdge(request));
     }
 
-    @Operation(summary = "删除知识关系")
+    @Operation(summary = "删除知识关系（仅管理员）")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/edges/{id}")
     public ApiResponse<Void> deleteEdge(@PathVariable Long id) {
         knowledgeGraphService.deleteEdge(id);

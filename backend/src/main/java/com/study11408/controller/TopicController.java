@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -30,13 +31,15 @@ public class TopicController {
         return ApiResponse.ok(topicService.getTopic(id));
     }
 
-    @Operation(summary = "创建主题")
+    @Operation(summary = "创建主题（仅管理员）")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/topics")
     public ApiResponse<TopicDTO> createTopic(@Valid @RequestBody TopicDTO dto) {
         return ApiResponse.ok(topicService.createTopic(dto));
     }
 
-    @Operation(summary = "更新主题")
+    @Operation(summary = "更新主题（仅管理员）")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/topics/{id}")
     public ApiResponse<TopicDTO> updateTopic(@PathVariable Long id, @Valid @RequestBody TopicDTO dto) {
         return ApiResponse.ok(topicService.updateTopic(id, dto));
