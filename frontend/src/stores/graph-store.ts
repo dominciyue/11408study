@@ -61,11 +61,13 @@ export const useGraphStore = create<GraphState & GraphActions>((set, get) => ({
     const { nodes } = get();
     if (!query.trim()) return nodes;
     const q = query.toLowerCase();
+    // C3: 后端 KnowledgeNodeDTO 不返 summary / tags，之前直接 .toLowerCase()
+    // 会 TypeError 让整页崩；用可选链 + 默认值。
     return nodes.filter(
       (n) =>
-        n.title.toLowerCase().includes(q) ||
-        n.summary.toLowerCase().includes(q) ||
-        n.tags.some((t) => t.toLowerCase().includes(q))
+        (n.title || "").toLowerCase().includes(q) ||
+        (n.summary || "").toLowerCase().includes(q) ||
+        (n.tags ?? []).some((t) => (t || "").toLowerCase().includes(q))
     );
   },
 }));

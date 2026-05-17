@@ -48,6 +48,13 @@ export default function MaterialImportPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function extractErrMessage(e: unknown): string {
+    if (e instanceof Error) return e.message;
+    if (typeof e === "string") return e;
+    return "操作失败";
+  }
 
   const subjectName = useMemo(
     () => subjects.find((s) => s.id === subjectId)?.name ?? "",
@@ -59,6 +66,7 @@ export default function MaterialImportPage() {
     let cancelled = false;
     async function run() {
       setIsLoading(true);
+      setError(null);
       try {
         const parsed = await postJson<ParseResp>(`/api/import/materials/${materialId}/parse-pdf`);
         if (!cancelled) {
@@ -70,6 +78,8 @@ export default function MaterialImportPage() {
           setSubjects(s.data);
           setSubjectId(s.data[0]?.id ?? null);
         }
+      } catch (e) {
+        if (!cancelled) setError(extractErrMessage(e));
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -106,6 +116,7 @@ export default function MaterialImportPage() {
   async function doExtract() {
     if (!currentChunk) return;
     setIsExtracting(true);
+    setError(null);
     try {
       const ex = await postJson<ExtractResp>("/api/import/extract", {
         text: currentChunk.content,
@@ -116,6 +127,8 @@ export default function MaterialImportPage() {
       const init: Record<number, boolean> = {};
       ex.knowledgePoints.forEach((_, i) => (init[i] = true));
       setChecked(init);
+    } catch (e) {
+      setError("AI 提取失败：" + extractErrMessage(e));
     } finally {
       setIsExtracting(false);
     }
@@ -126,6 +139,7 @@ export default function MaterialImportPage() {
     const picked = extract.knowledgePoints.filter((_, i) => checked[i]);
     if (!picked.length) return;
     setIsImporting(true);
+    setError(null);
     try {
       for (const p of picked) {
         await knowledgeApi.createNode({
@@ -136,6 +150,8 @@ export default function MaterialImportPage() {
         });
       }
       router.push("/graph");
+    } catch (e) {
+      setError("导入失败：" + extractErrMessage(e));
     } finally {
       setIsImporting(false);
     }
@@ -155,13 +171,24 @@ export default function MaterialImportPage() {
         </Button>
       </div>
 
+      {/* 全局错误条 — 显示 fetch / extract / import 的错误信息 */}
+      {error && (
+        <Card className="border-red-500/30 bg-red-500/5">
+          <CardContent className="py-3 px-4 text-sm text-red-300 flex items-start gap-2">
+            <span>⚠</span>
+            <span className="flex-1">{error}</span>
+            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-200">×</button>
+          </CardContent>
+        </Card>
+      )}
+
       {isLoading ? (
         <Card className="border-white/[0.06]">
           <CardContent className="p-6 text-gray-500">加载中…</CardContent>
         </Card>
       ) : !parse ? (
         <Card className="border-white/[0.06]">
-          <CardContent className="p-6 text-gray-500">解析失败或无数据。</CardContent>
+          <CardContent className="p-6 text-gray-500">解析失败或无数据。{error ? "" : "请确认文件是有效 PDF。"}</CardContent>
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

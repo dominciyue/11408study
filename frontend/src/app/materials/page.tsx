@@ -25,6 +25,7 @@ import type { Material } from "@/types";
 
 const typeIcon: Record<string, React.ElementType> = {
   PDF: FileText,
+  "图片": Link2,  // 图标占位（lucide 无单独 Image 名避免冲突）
   "视频": Video,
   "链接": Link2,
 };
@@ -86,8 +87,14 @@ export default function MaterialsPage() {
     const form = new FormData();
     form.append("file", file);
     form.append("title", file.name);
-    const res = await materialsApi.upload(form);
-    setItems((prev) => [res.data, ...prev]);
+    try {
+      const res = await materialsApi.upload(form);
+      setItems((prev) => [res.data, ...prev]);
+    } catch (e: unknown) {
+      // 后端返回 413 / 500 等都走这里；不再静默失败
+      const msg = (e as { message?: string })?.message || "上传失败";
+      window.alert(msg);
+    }
   }
 
   return (
@@ -257,7 +264,15 @@ export default function MaterialsPage() {
           </Card>
         ) : (
           filtered.map((material) => {
-          const Icon = typeIcon["PDF"] || FileText;
+          // M2 修复：之前硬写 typeIcon["PDF"]，所有资料都用 PDF 图标。
+          // 现按 MIME 大类映射：image/* → 图片图标、video/* → 视频图标、其余文件
+          const Icon = material.type?.startsWith("image/")
+            ? typeIcon["图片"] ?? FileText
+            : material.type?.startsWith("video/")
+            ? typeIcon["视频"] ?? FileText
+            : material.type === "application/pdf"
+            ? typeIcon["PDF"] ?? FileText
+            : FileText;
           const sizeMb = material.fileSize ? `${(material.fileSize / (1024 * 1024)).toFixed(1)} MB` : "-";
           return (
             <Card key={material.id} className="border-white/[0.06] hover:border-white/[0.12] transition-colors">
@@ -311,8 +326,17 @@ export default function MaterialsPage() {
                     size="sm"
                     className="text-gray-500 hover:text-red-400 h-8 w-8 p-0"
                     onClick={async () => {
-                      await materialsApi.delete(material.id);
-                      setItems((prev) => prev.filter((x) => x.id !== material.id));
+                      // M3 修复：删文件不可逆，加确认
+                      if (!window.confirm(`确认删除「${material.title}」？文件将从存储中移除且不可恢复。`)) {
+                        return;
+                      }
+                      try {
+                        await materialsApi.delete(material.id);
+                        setItems((prev) => prev.filter((x) => x.id !== material.id));
+                      } catch (e: unknown) {
+                        const msg = (e as { message?: string })?.message || "删除失败";
+                        window.alert(msg);
+                      }
                     }}
                   >
                     <Trash2 className="w-4 h-4" />

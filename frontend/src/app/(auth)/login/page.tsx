@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { GraduationCap, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/auth-store";
 
-export default function LoginPage() {
+function LoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, isLoading, error, setError } = useAuthStore();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -21,7 +22,13 @@ export default function LoginPage() {
     setError(null);
     try {
       await login({ username, password });
-      router.push("/dashboard");
+      // 登录成功后回到原本想去的页面（route guard 写入 ?redirect=...），默认 /dashboard
+      const redirect = searchParams.get("redirect");
+      // 防开放重定向：只接受 / 开头且非 //（站内相对路径）
+      const safe = redirect && redirect.startsWith("/") && !redirect.startsWith("//")
+          ? redirect
+          : "/dashboard";
+      router.replace(safe);
     } catch {
       // error is set in the store
     }
@@ -93,5 +100,14 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// useSearchParams 必须在 Suspense 边界内
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginInner />
+    </Suspense>
   );
 }

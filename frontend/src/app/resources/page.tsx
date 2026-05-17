@@ -884,9 +884,15 @@ function LinkCard({
 
       <div className="flex items-center justify-between mt-auto">
         <span className="text-[11px] text-gray-500 truncate max-w-[60%]">
-          {item.url
-            ? new URL(item.url).hostname.replace(/^www\./, "")
-            : "暂无可信 URL"}
+          {(() => {
+            // new URL() 在 protocol 缺失等异常时会 throw 让整页崩；safe parse。
+            if (!item.url) return "暂无可信 URL";
+            try {
+              return new URL(item.url).hostname.replace(/^www\./, "");
+            } catch {
+              return item.url.slice(0, 40);
+            }
+          })()}
         </span>
         <Button
           size="sm"

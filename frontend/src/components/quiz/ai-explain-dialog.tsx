@@ -91,9 +91,14 @@ export default function AiExplainDialog({
     setPending(true);
     setError(null);
     try {
+      // history 上限：最近 10 轮 = 20 条消息，防 DeepSeek context 4096 超限 + 费用爆炸
+      const MAX_HISTORY = 20;
+      const trimmedHistory = next.length > MAX_HISTORY
+          ? next.slice(next.length - MAX_HISTORY)
+          : next;
       const res = await quizApi.aiExplain(questionId, {
         userAnswer,
-        history: next,
+        history: trimmedHistory,
       });
       const data = res.data;
       if (data && typeof data.reply === "string") {
