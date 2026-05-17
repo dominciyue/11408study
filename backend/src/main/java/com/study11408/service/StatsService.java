@@ -77,14 +77,20 @@ public class StatsService {
                 .sum();
 
         LocalDate today = LocalDate.now(ZoneId.systemDefault());
-        long studiedToday = sessions.stream()
-                .filter(s -> s.getStartTime() != null && s.getStartTime().toLocalDate().equals(today))
-                .mapToLong(s -> s.getStudiedNodes() == null ? 0 : s.getStudiedNodes())
-                .sum();
-        long reviewedToday = sessions.stream()
-                .filter(s -> s.getStartTime() != null && s.getStartTime().toLocalDate().equals(today))
-                .mapToLong(s -> s.getReviewedNodes() == null ? 0 : s.getReviewedNodes())
-                .sum();
+        // P1: 之前依赖 StudySession.studiedNodes 列，但该列从无递增代码 → 永远 0。
+        // 现在改用 StudyProgress.lastReview 当天的条目数：
+        // - studiedToday：本日首次接触（rep==1）的节点
+        // - reviewedToday：本日复习（rep>1）的节点
+        long studiedToday = progressList.stream()
+                .filter(p -> p.getLastReview() != null
+                        && p.getLastReview().toLocalDate().equals(today))
+                .filter(p -> p.getRepetitionCount() != null && p.getRepetitionCount() <= 1)
+                .count();
+        long reviewedToday = progressList.stream()
+                .filter(p -> p.getLastReview() != null
+                        && p.getLastReview().toLocalDate().equals(today))
+                .filter(p -> p.getRepetitionCount() != null && p.getRepetitionCount() > 1)
+                .count();
         long studyTimeTodayMinutes = sessions.stream()
                 .filter(s -> s.getStartTime() != null && s.getStartTime().toLocalDate().equals(today))
                 .filter(s -> s.getEndTime() != null)
@@ -95,11 +101,17 @@ public class StatsService {
                 .filter(s -> s.getStartTime() != null)
                 .collect(Collectors.groupingBy(s -> s.getStartTime().toLocalDate()));
 
+        // 任何当天 lastReview 也算"学过"，否则只用 feedback 不开 session 的用户 streak=0。
+        Set<LocalDate> reviewDays = progressList.stream()
+                .filter(p -> p.getLastReview() != null)
+                .map(p -> p.getLastReview().toLocalDate())
+                .collect(Collectors.toSet());
+
         int streakDays = 0;
         for (int i = 0; i < 365; i++) {
             LocalDate day = today.minusDays(i);
             List<StudySession> daySessions = sessionsByDay.getOrDefault(day, Collections.emptyList());
-            boolean studied = daySessions.stream().anyMatch(s -> {
+            boolean studied = reviewDays.contains(day) || daySessions.stream().anyMatch(s -> {
                 if (s.getEndTime() == null) return false;
                 long minutes = java.time.Duration.between(s.getStartTime(), s.getEndTime()).toMinutes();
                 return minutes > 0 || (s.getStudiedNodes() != null && s.getStudiedNodes() > 0) || (s.getReviewedNodes() != null && s.getReviewedNodes() > 0);
