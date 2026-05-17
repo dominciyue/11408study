@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Route, ChevronRight } from "lucide-react";
 import { subjectsApi, studyApi } from "@/lib/api";
 import type { KnowledgeNode, Subject } from "@/types";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
 export default function StudyPathPage() {
+  const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number | null>(null);
   const [path, setPath] = useState<KnowledgeNode[]>([]);
@@ -116,7 +118,7 @@ export default function StudyPathPage() {
                       const qs = sid
                         ? `?subjectId=${sid}&focusNodeId=${node.id}`
                         : `?focusNodeId=${node.id}`;
-                      window.location.href = `/graph${qs}`;
+                      router.push(`/graph${qs}`);
                     }}
                   >
                     去图谱

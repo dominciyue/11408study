@@ -1,17 +1,14 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Search,
-  Bell,
   BookOpen,
   ClipboardCheck,
   Moon,
   Sun,
   LogOut,
-  User,
-  Settings,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -37,16 +34,29 @@ export function Header() {
   // assumption) to avoid a hydration mismatch warning.
   const isDark = hydrated ? theme === "dark" : true;
 
+  const [searchQuery, setSearchQuery] = useState("");
+
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (!q) return;
+    // 跳转到知识图谱页（默认 408 学科），focusNodeId 暂不解析；
+    // 后续若有 /knowledge/search 结果页可改成那里。
+    router.push(`/graph?subjectId=4&q=${encodeURIComponent(q)}`);
+  }
+
   return (
     <header className="flex items-center gap-4 h-16 px-6 bg-header backdrop-blur-xl border-b border-border shrink-0 sticky top-0 z-40">
       {/* Search */}
-      <div className="relative flex-1 max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
         <Input
-          placeholder="搜索知识点..."
+          placeholder="搜索知识点（回车跳图谱）..."
           className="pl-10 bg-foreground/[0.03] border-border h-9"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
         />
-      </div>
+      </form>
 
       <div className="flex-1" />
 
@@ -72,16 +82,6 @@ export function Header() {
         </Button>
       </div>
 
-      {/* Notifications */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="relative text-muted-foreground hover:text-foreground"
-      >
-        <Bell className="w-5 h-5" />
-        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-500 rounded-full" />
-      </Button>
-
       {/* Theme toggle */}
       <Button
         variant="ghost"
@@ -94,7 +94,7 @@ export function Header() {
         {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
       </Button>
 
-      {/* User dropdown */}
+      {/* User dropdown — profile/settings 未实现，先只保留退出 */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button className="cursor-pointer focus:outline-none">
@@ -114,15 +114,6 @@ export function Header() {
               <p className="text-xs text-muted-foreground">{user?.email || ""}</p>
             </div>
           </DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => router.push("/profile")}>
-            <User className="w-4 h-4 mr-2" />
-            个人资料
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => router.push("/settings")}>
-            <Settings className="w-4 h-4 mr-2" />
-            设置
-          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={logout} className="text-red-500 dark:text-red-400 focus:text-red-500 dark:focus:text-red-400">
             <LogOut className="w-4 h-4 mr-2" />

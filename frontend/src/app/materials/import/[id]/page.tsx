@@ -3,13 +3,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { FileText, Wand2, ChevronLeft, Check } from "lucide-react";
-import { knowledgeApi, topicsApi } from "@/lib/api";
+import { knowledgeApi, subjectsApi, topicsApi } from "@/lib/api";
 import { getToken } from "@/lib/auth";
-import type { Topic } from "@/types";
+import type { Subject, Topic } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 
 type PdfChunk = { content: string; pageNumber?: number; sectionTitle?: string };
 type ParseResp = { title?: string; totalPages?: number; chunks: PdfChunk[] };
@@ -42,13 +41,20 @@ export default function MaterialImportPage() {
   const [selectedChunkIdx, setSelectedChunkIdx] = useState<number | null>(null);
   const [extract, setExtract] = useState<ExtractResp | null>(null);
   const [checked, setChecked] = useState<Record<number, boolean>>({});
-  const [subjectName, setSubjectName] = useState("408计算机专业基础");
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [subjectId, setSubjectId] = useState<number | null>(null);
   const [topicId, setTopicId] = useState<number | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
+  const subjectName = useMemo(
+    () => subjects.find((s) => s.id === subjectId)?.name ?? "",
+    [subjects, subjectId]
+  );
+
+  // 加载 PDF 解析 + 学科列表（默认选第一个学科）
   useEffect(() => {
     let cancelled = false;
     async function run() {
@@ -59,11 +65,10 @@ export default function MaterialImportPage() {
           setParse(parsed);
           setSelectedChunkIdx(parsed.chunks.length ? 0 : null);
         }
-        // 默认加载 408(=4) 的 topics（后续可做 subjectId 选择）
-        const t = await topicsApi.listBySubject(4);
+        const s = await subjectsApi.list();
         if (!cancelled) {
-          setTopics(t.data);
-          setTopicId(t.data[0]?.id ?? null);
+          setSubjects(s.data);
+          setSubjectId(s.data[0]?.id ?? null);
         }
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -74,6 +79,24 @@ export default function MaterialImportPage() {
       cancelled = true;
     };
   }, [materialId]);
+
+  // subjectId 切换时重载 topics
+  useEffect(() => {
+    if (subjectId == null) {
+      setTopics([]);
+      setTopicId(null);
+      return;
+    }
+    let cancelled = false;
+    topicsApi.listBySubject(subjectId).then((t) => {
+      if (cancelled) return;
+      setTopics(t.data);
+      setTopicId(t.data[0]?.id ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [subjectId]);
 
   const currentChunk = useMemo(() => {
     if (!parse || selectedChunkIdx == null) return null;
@@ -176,8 +199,18 @@ export default function MaterialImportPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                  <div className="text-xs text-gray-500 mb-1">学科名（传给 AI 提示用）</div>
-                  <Input className="bg-white/5 border-white/[0.08]" value={subjectName} onChange={(e) => setSubjectName(e.target.value)} />
+                  <div className="text-xs text-gray-500 mb-1">学科</div>
+                  <select
+                    className="w-full h-10 rounded-md bg-white/5 border border-white/[0.08] text-gray-200 px-3"
+                    value={subjectId ?? ""}
+                    onChange={(e) => setSubjectId(Number(e.target.value))}
+                  >
+                    {subjects.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="md:col-span-2">
                   <div className="text-xs text-gray-500 mb-1">导入到 Topic</div>

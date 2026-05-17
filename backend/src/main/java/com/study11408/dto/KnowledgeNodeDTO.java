@@ -19,7 +19,11 @@ public class KnowledgeNodeDTO {
     private String difficulty;
     private Long topicId;
     private String topicName;
+    /** 用于前端按学科 chip 过滤 / 跳转，避免再绕 topic→subject 反查。 */
+    private Long subjectId;
     private String subjectName;
+    /** 当前登录用户在此节点的 mastery（0-100）；未学过则 null（前端星级显示"未学"）。 */
+    private Integer mastery;
     private String metadata;
     private LocalDateTime createdAt;
 }

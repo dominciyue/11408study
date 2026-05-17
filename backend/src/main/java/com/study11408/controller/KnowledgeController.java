@@ -1,9 +1,11 @@
 package com.study11408.controller;
 
 import com.study11408.dto.*;
+import com.study11408.security.JwtTokenProvider;
 import com.study11408.service.KnowledgeGraphService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -21,6 +23,7 @@ import java.util.Map;
 public class KnowledgeController {
 
     private final KnowledgeGraphService knowledgeGraphService;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Operation(summary = "分页查询知识节点")
     @GetMapping("/nodes")
@@ -78,10 +81,18 @@ public class KnowledgeController {
         return ApiResponse.ok();
     }
 
-    @Operation(summary = "获取学科完整图谱数据")
+    @Operation(summary = "获取学科完整图谱数据（含当前用户每节点 mastery）")
     @GetMapping("/graph/{subjectId}")
-    public ApiResponse<GraphDataDTO> getGraphData(@PathVariable Long subjectId) {
-        return ApiResponse.ok(knowledgeGraphService.getGraphData(subjectId));
+    public ApiResponse<GraphDataDTO> getGraphData(HttpServletRequest request,
+                                                  @PathVariable Long subjectId) {
+        Long userId = null;
+        try {
+            String token = jwtTokenProvider.resolveToken(request);
+            if (token != null) userId = jwtTokenProvider.getUserId(token);
+        } catch (Exception ignore) {
+            // 未登录也允许浏览图谱，mastery 字段保持 null
+        }
+        return ApiResponse.ok(knowledgeGraphService.getGraphData(subjectId, userId));
     }
 
     @Operation(summary = "获取节点聚焦子图")

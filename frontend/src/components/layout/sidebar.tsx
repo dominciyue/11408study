@@ -16,7 +16,6 @@ import {
   ChevronRight,
   GraduationCap,
   Route,
-  Settings,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -188,11 +187,10 @@ export function Sidebar() {
           )}
           {!collapsed && (
             <div className="flex items-center gap-1">
-              <button className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-colors cursor-pointer">
-                <Settings className="w-4 h-4" />
-              </button>
+              {/* Settings 入口暂未实现，已移除避免死按钮 */}
               <button
                 onClick={logout}
+                title="退出登录"
                 className="p-1.5 rounded-md text-muted-foreground hover:text-red-500 dark:hover:text-red-400 hover:bg-foreground/5 transition-colors cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />

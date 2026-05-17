@@ -98,9 +98,14 @@ export interface KnowledgeEdge {
   id: number;
   sourceId: number;
   targetId: number;
-  relationship: "prerequisite" | "related" | "includes" | "extends";
+  /** 后端 KnowledgeEdgeDTO 字段名为 relationType；前端历史用过 relationship 已纠正。
+   *  种子取值：PREREQUISITE / RELATED / EXTENDS / CROSS_SUBJECT（大写）。 */
+  relationType: string;
   weight: number;
   label?: string;
+  sourceTitle?: string;
+  targetTitle?: string;
+  description?: string;
 }
 
 export interface GraphData {

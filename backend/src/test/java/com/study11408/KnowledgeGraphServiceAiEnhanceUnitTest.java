@@ -45,13 +45,14 @@ class KnowledgeGraphServiceAiEnhanceUnitTest {
     @Mock private KnowledgeEdgeRepository edgeRepository;
     @Mock private TopicRepository topicRepository;
     @Mock private AiClientService aiClientService;
+    @Mock private com.study11408.repository.StudyProgressRepository progressRepository;
 
     private KnowledgeGraphService service;
 
     @BeforeEach
     void setup() {
         service = new KnowledgeGraphService(
-                nodeRepository, edgeRepository, topicRepository, aiClientService);
+                nodeRepository, edgeRepository, topicRepository, aiClientService, progressRepository);
     }
 
     @Test

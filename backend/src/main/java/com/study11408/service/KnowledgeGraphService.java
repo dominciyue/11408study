@@ -7,6 +7,7 @@ import com.study11408.entity.Topic;
 import com.study11408.exception.BusinessException;
 import com.study11408.repository.KnowledgeEdgeRepository;
 import com.study11408.repository.KnowledgeNodeRepository;
+import com.study11408.repository.StudyProgressRepository;
 import com.study11408.repository.TopicRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -29,6 +30,7 @@ public class KnowledgeGraphService {
     private final KnowledgeEdgeRepository edgeRepository;
     private final TopicRepository topicRepository;
     private final AiClientService aiClientService;
+    private final StudyProgressRepository progressRepository;
 
     public Page<KnowledgeNodeDTO> getNodes(Long topicId, Long subjectId, String keyword, Pageable pageable) {
         String normalizedKeyword = keyword == null ? null : keyword.trim();
@@ -145,6 +147,14 @@ public class KnowledgeGraphService {
     }
 
     public GraphDataDTO getGraphData(Long subjectId) {
+        return getGraphData(subjectId, null);
+    }
+
+    /**
+     * 当 userId 非空时，给每个节点 DTO 注入该用户的 masteryLevel；
+     * 前端 graph 页的"按掌握度过滤"和星级依赖这个字段。
+     */
+    public GraphDataDTO getGraphData(Long subjectId, Long userId) {
         List<KnowledgeNode> nodes = nodeRepository.findByTopicSubjectId(subjectId);
         Set<Long> nodeIds = nodes.stream().map(KnowledgeNode::getId).collect(Collectors.toSet());
 
@@ -158,10 +168,23 @@ public class KnowledgeGraphService {
                 .distinct()
                 .collect(Collectors.toList());
 
+        java.util.Map<Long, Integer> masteryByNode = buildMasteryMap(userId);
+
         return GraphDataDTO.builder()
-                .nodes(nodes.stream().map(this::toNodeDTO).collect(Collectors.toList()))
+                .nodes(nodes.stream().map(n -> toNodeDTO(n, masteryByNode)).collect(Collectors.toList()))
                 .edges(filteredEdges.stream().map(this::toEdgeDTO).collect(Collectors.toList()))
                 .build();
+    }
+
+    /** userId 为 null 时返回空 map（toNodeDTO 跳过 mastery 注入）。 */
+    private java.util.Map<Long, Integer> buildMasteryMap(Long userId) {
+        if (userId == null) return null;
+        return progressRepository.findByUserId(userId).stream()
+                .filter(p -> p.getNodeId() != null && p.getMasteryLevel() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        com.study11408.entity.StudyProgress::getNodeId,
+                        com.study11408.entity.StudyProgress::getMasteryLevel,
+                        (a, b) -> a));
     }
 
     public GraphDataDTO getFocusGraph(Long nodeId, int depth) {
@@ -208,6 +231,17 @@ public class KnowledgeGraphService {
     }
 
     private KnowledgeNodeDTO toNodeDTO(KnowledgeNode node) {
+        return toNodeDTO(node, null);
+    }
+
+    /**
+     * mastery 来自 study_progress 表，需要当前用户上下文。
+     * masteryByNode == null 时跳过 mastery 注入（unauthed / 不关心 mastery 的端点）。
+     */
+    private KnowledgeNodeDTO toNodeDTO(KnowledgeNode node, java.util.Map<Long, Integer> masteryByNode) {
+        Long subjectId = (node.getTopic() != null && node.getTopic().getSubject() != null)
+                ? node.getTopic().getSubject().getId() : null;
+        Integer mastery = (masteryByNode != null) ? masteryByNode.get(node.getId()) : null;
         return KnowledgeNodeDTO.builder()
                 .id(node.getId())
                 .title(node.getTitle())
@@ -215,8 +249,10 @@ public class KnowledgeGraphService {
                 .difficulty(node.getDifficulty())
                 .topicId(node.getTopicId())
                 .topicName(node.getTopic() != null ? node.getTopic().getName() : null)
+                .subjectId(subjectId)
                 .subjectName(node.getTopic() != null && node.getTopic().getSubject() != null
                         ? node.getTopic().getSubject().getName() : null)
+                .mastery(mastery)
                 .metadata(node.getMetadata())
                 .createdAt(node.getCreatedAt())
                 .build();

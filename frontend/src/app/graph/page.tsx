@@ -154,7 +154,7 @@ function toXyflowNode(
 }
 
 function toXyflowEdge(e: KnowledgeEdgeType): Edge {
-  const rel = normalizeRelation(e.relationship);
+  const rel = normalizeRelation(e.relationType);
   const color = edgeColors[rel] || edgeColors.RELATED;
   const dash = edgeDashArray[rel];
   return {
