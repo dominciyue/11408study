@@ -124,4 +124,15 @@ public class JwtTokenProvider {
         }
         return null;
     }
+
+    /** access token 缺 type 字段，refresh token 写入 "refresh"。 */
+    public String getTokenType(String token) {
+        Claims claims = Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+        Object type = claims.get("type");
+        return type == null ? "access" : String.valueOf(type);
+    }
 }

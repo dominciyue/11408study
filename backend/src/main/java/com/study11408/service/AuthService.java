@@ -70,7 +70,16 @@ public class AuthService {
     }
 
     public AuthResponse refreshToken(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BusinessException("无效的刷新令牌", HttpStatus.UNAUTHORIZED);
+        }
         if (!jwtTokenProvider.validateToken(refreshToken)) {
+            throw new BusinessException("无效的刷新令牌", HttpStatus.UNAUTHORIZED);
+        }
+        // 防止用 access token 当 refresh token：refresh token 必带 type=refresh
+        // 否则任何被泄露的 24h access token 都能换出新的 access token，
+        // 永远续命，越过短期 token 的安全边界。
+        if (!"refresh".equals(jwtTokenProvider.getTokenType(refreshToken))) {
             throw new BusinessException("无效的刷新令牌", HttpStatus.UNAUTHORIZED);
         }
 
