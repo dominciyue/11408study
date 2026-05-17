@@ -47,6 +47,7 @@ public class QuizService {
     private final StudyProgressRepository progressRepository;
     private final KnowledgeNodeRepository nodeRepository;
 
+    @Transactional(readOnly = true)
     public List<QuizQuestion> generateQuiz(List<Long> nodeIds, int count) {
         List<QuizQuestion> questions = questionRepository.findRandomByNodeIds(nodeIds, count);
         if (questions.isEmpty()) {
@@ -247,6 +248,7 @@ public class QuizService {
      * <p>若 subjectId 为 null：仅从用户已有进度池里挑（不补"未学新题"）。
      * <p>若候选 < count：返回少于 count 道（不报错，前端可提示）。
      */
+    @Transactional(readOnly = true)
     public List<QuizQuestion> adaptiveGenerate(Long userId, Long subjectId, int count) {
         if (count <= 0) return List.of();
         if (!userRepository.existsById(userId)) {
@@ -339,6 +341,7 @@ public class QuizService {
         return result;
     }
 
+    @Transactional(readOnly = true)
     public List<WrongAnswerDTO> getWrongAnswers(Long userId) {
         return wrongAnswerRepository.findByUserIdAndResolvedFalse(userId).stream()
                 .map(this::toWrongAnswerDTO)
