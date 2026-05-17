@@ -6,7 +6,9 @@ import com.study11408.dto.QuizSubmitRequest;
 import com.study11408.dto.WrongAnswerDTO;
 import com.study11408.entity.QuizQuestion;
 import com.study11408.security.JwtTokenProvider;
+import com.study11408.service.AiRateLimiter;
 import com.study11408.service.QuizService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +27,7 @@ public class QuizController {
 
     private final QuizService quizService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AiRateLimiter aiRateLimiter;
 
     @Operation(summary = "智能组卷")
     @PostMapping("/generate")
@@ -76,6 +79,7 @@ public class QuizController {
             @PathVariable Long questionId,
             @Valid @RequestBody QuizAiExplainRequest body) {
         Long userId = getUserId(request);
+        aiRateLimiter.check(userId);
         return ApiResponse.ok(quizService.explainWithAi(userId, questionId, body));
     }
 
@@ -87,12 +91,15 @@ public class QuizController {
             @RequestParam(defaultValue = "5") int count,
             @RequestParam(defaultValue = "CHOICE") String type,
             @RequestParam(required = false) String difficulty) {
-        // auth 由 Spring Security 兜底
-        getUserId(request);
+        Long userId = getUserId(request);
+        aiRateLimiter.check(userId);
         return ApiResponse.ok(quizService.generateAndSaveForNode(nodeId, count, type, difficulty));
     }
 
-    @Operation(summary = "为整个学科批量生成 AI 题目（admin 补题库）")
+    @Operation(summary = "为整个学科批量生成 AI 题目（仅管理员）",
+            description = "单次最多 50 节点 × 20 题/节点 = 1000 次 LLM 调用，"
+                    + "成本极高；限管理员。")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/subjects/{subjectId}/seed-questions")
     public ApiResponse<Map<String, Object>> seedSubject(
             HttpServletRequest request,

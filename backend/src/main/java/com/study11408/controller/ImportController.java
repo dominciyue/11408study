@@ -6,6 +6,7 @@ import com.study11408.exception.BusinessException;
 import com.study11408.repository.MaterialRepository;
 import com.study11408.security.JwtTokenProvider;
 import com.study11408.service.AiClientService;
+import com.study11408.service.AiRateLimiter;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,11 +27,13 @@ public class ImportController {
     private final MaterialRepository materialRepository;
     private final AiClientService aiClientService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AiRateLimiter aiRateLimiter;
 
     @Operation(summary = "解析资料PDF为分块")
     @PostMapping("/materials/{materialId}/parse-pdf")
     public ApiResponse<ImportPdfParseResponse> parsePdf(@PathVariable Long materialId, HttpServletRequest request) {
         Long userId = getUserId(request);
+        aiRateLimiter.check(userId);
 
         Material material = materialRepository.findById(materialId)
                 .orElseThrow(() -> new BusinessException("资料不存在", HttpStatus.NOT_FOUND));
@@ -76,8 +79,8 @@ public class ImportController {
     @Operation(summary = "对文本分块进行知识点提取")
     @PostMapping("/extract")
     public ApiResponse<ImportKnowledgeExtractResponse> extract(@Valid @RequestBody ImportKnowledgeExtractRequest body, HttpServletRequest request) {
-        // extract 不绑定 materialId，仅做登录校验避免任意调用者刷 LLM 费用
-        getUserId(request);
+        Long userId = getUserId(request);
+        aiRateLimiter.check(userId);
 
         Map<String, Object> raw = aiClientService.extractKnowledge(body.getText(), body.getSubject(), body.getTopic());
         if (raw == null || raw.containsKey("error")) {

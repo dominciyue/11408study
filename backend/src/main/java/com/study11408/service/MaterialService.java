@@ -42,17 +42,26 @@ public class MaterialService {
 
     @Transactional
     public Material uploadMaterial(MultipartFile file, String title, Long nodeId, Long uploaderId) {
+        // 先校验依赖，避免 MinIO put 成功后才发现用户/节点不存在 → 孤儿对象
+        User uploader = userRepository.findById(uploaderId)
+                .orElseThrow(() -> new BusinessException("用户不存在", HttpStatus.NOT_FOUND));
+        KnowledgeNode node = null;
+        if (nodeId != null) {
+            node = nodeRepository.findById(nodeId)
+                    .orElseThrow(() -> new BusinessException("知识节点不存在", HttpStatus.NOT_FOUND));
+        }
+
+        String originalName = file.getOriginalFilename();
+        String extension = originalName != null && originalName.contains(".")
+                ? originalName.substring(originalName.lastIndexOf("."))
+                : "";
+        String objectName = UUID.randomUUID() + extension;
+
         try {
             boolean bucketExists = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
             if (!bucketExists) {
                 minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
             }
-
-            String originalName = file.getOriginalFilename();
-            String extension = originalName != null && originalName.contains(".")
-                    ? originalName.substring(originalName.lastIndexOf("."))
-                    : "";
-            String objectName = UUID.randomUUID() + extension;
 
             try (InputStream inputStream = file.getInputStream()) {
                 minioClient.putObject(PutObjectArgs.builder()
@@ -62,32 +71,35 @@ public class MaterialService {
                         .contentType(file.getContentType())
                         .build());
             }
-
-            String fileUrl = endpoint + "/" + bucket + "/" + objectName;
-
-            User uploader = userRepository.findById(uploaderId)
-                    .orElseThrow(() -> new BusinessException("用户不存在", HttpStatus.NOT_FOUND));
-
-            Material.MaterialBuilder builder = Material.builder()
-                    .title(title != null ? title : originalName)
-                    .type(file.getContentType())
-                    .fileUrl(fileUrl)
-                    .originalName(originalName)
-                    .fileSize(file.getSize())
-                    .uploader(uploader);
-
-            if (nodeId != null) {
-                KnowledgeNode node = nodeRepository.findById(nodeId)
-                        .orElseThrow(() -> new BusinessException("知识节点不存在", HttpStatus.NOT_FOUND));
-                builder.node(node);
-            }
-
-            return materialRepository.save(builder.build());
-        } catch (BusinessException e) {
-            throw e;
         } catch (Exception e) {
-            log.error("文件上传失败", e);
+            log.error("MinIO 上传失败", e);
             throw new BusinessException("文件上传失败: " + e.getMessage());
+        }
+
+        // MinIO 写成功后再保存 DB；若 save 抛任何异常，best-effort 清掉孤儿对象
+        // 否则用户/管理员永远看不到该文件但 bucket 仍占空间。
+        String fileUrl = endpoint + "/" + bucket + "/" + objectName;
+        Material.MaterialBuilder builder = Material.builder()
+                .title(title != null ? title : originalName)
+                .type(file.getContentType())
+                .fileUrl(fileUrl)
+                .originalName(originalName)
+                .fileSize(file.getSize())
+                .uploader(uploader);
+        if (node != null) builder.node(node);
+
+        try {
+            return materialRepository.save(builder.build());
+        } catch (RuntimeException dbFail) {
+            log.error("Material 入库失败，尝试回滚 MinIO 对象 {}", objectName, dbFail);
+            try {
+                minioClient.removeObject(RemoveObjectArgs.builder()
+                        .bucket(bucket).object(objectName).build());
+            } catch (Exception cleanupFail) {
+                log.warn("MinIO 孤儿对象清理失败（需人工介入）: {} / {}",
+                        objectName, cleanupFail.getMessage());
+            }
+            throw dbFail;
         }
     }
 

@@ -2,6 +2,7 @@ package com.study11408.controller;
 
 import com.study11408.dto.*;
 import com.study11408.security.JwtTokenProvider;
+import com.study11408.service.AiRateLimiter;
 import com.study11408.service.KnowledgeGraphService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +26,7 @@ public class KnowledgeController {
 
     private final KnowledgeGraphService knowledgeGraphService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AiRateLimiter aiRateLimiter;
 
     @Operation(summary = "分页查询知识节点")
     @GetMapping("/nodes")
@@ -123,8 +125,11 @@ public class KnowledgeController {
     @Operation(summary = "AI 深入解读节点（详解/口诀/类比）")
     @PostMapping("/nodes/{id}/ai-enhance")
     public ApiResponse<Map<String, Object>> aiEnhanceNode(
+            HttpServletRequest request,
             @PathVariable Long id,
             @RequestParam(defaultValue = "EXPLAIN") String type) {
+        Long userId = jwtTokenProvider.getUserId(jwtTokenProvider.resolveToken(request));
+        aiRateLimiter.check(userId);
         return ApiResponse.ok(knowledgeGraphService.aiEnhanceNode(id, type));
     }
 }

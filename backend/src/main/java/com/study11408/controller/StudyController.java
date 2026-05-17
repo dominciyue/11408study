@@ -9,6 +9,7 @@ import com.study11408.entity.StudyPlan;
 import com.study11408.entity.StudyProgress;
 import com.study11408.entity.StudySession;
 import com.study11408.security.JwtTokenProvider;
+import com.study11408.service.AiRateLimiter;
 import com.study11408.service.StudyPathService;
 import com.study11408.service.StudySessionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,6 +31,7 @@ public class StudyController {
     private final StudyPathService studyPathService;
     private final StudySessionService studySessionService;
     private final JwtTokenProvider jwtTokenProvider;
+    private final AiRateLimiter aiRateLimiter;
 
     @Operation(summary = "生成学科学习路径")
     @GetMapping("/path/{subjectId}")
@@ -106,6 +108,7 @@ public class StudyController {
             HttpServletRequest request,
             @Valid @RequestBody StudyPlanRequest body) {
         Long userId = getUserId(request);
+        aiRateLimiter.check(userId);
         return ApiResponse.ok(studyPathService.generateAiPlan(userId, body));
     }
 
