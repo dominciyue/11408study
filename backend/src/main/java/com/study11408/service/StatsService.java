@@ -276,7 +276,11 @@ public class StatsService {
     public Map<String, Object> getWeaknessAnalysis(Long userId) {
         List<WrongAnswer> wrongAnswers = wrongAnswerRepository.findByUserId(userId);
 
+        // 真题（V9/V11 link-based）允许 node_id=NULL，groupingBy 收 null key 会
+        // 抛 "element cannot be mapped to a null key" → 整个接口 500。
+        // 这里把无 node 的错题滤掉（弱点分析本来就以 node 为粒度，无 node 也无意义）。
         Map<Long, Long> wrongCountByNode = wrongAnswers.stream()
+                .filter(w -> w.getQuestion() != null && w.getQuestion().getNodeId() != null)
                 .collect(Collectors.groupingBy(
                         w -> w.getQuestion().getNodeId(),
                         Collectors.counting()));

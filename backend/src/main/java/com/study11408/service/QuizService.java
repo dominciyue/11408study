@@ -344,20 +344,8 @@ public class QuizService {
                 .toList();
     }
 
-    /**
-     * 标记错题为已解决（用户在错题本上点 ✓）。带 ownership 校验。
-     */
-    @Transactional
-    public WrongAnswerDTO markWrongAnswerResolved(Long userId, Long wrongAnswerId) {
-        WrongAnswer w = wrongAnswerRepository.findByIdAndUserId(wrongAnswerId, userId)
-                .orElseThrow(() -> new BusinessException("错题不存在或无权限", HttpStatus.NOT_FOUND));
-        if (Boolean.TRUE.equals(w.getResolved())) {
-            return toWrongAnswerDTO(w);  // 幂等：已解决则直接返回
-        }
-        w.setResolved(true);
-        wrongAnswerRepository.save(w);
-        return toWrongAnswerDTO(w);
-    }
+    // 删除：markWrongAnswerResolved — 已迁移到 WrongAnswerService.resolve(uid, id)
+    // 调用面已全部走 WrongAnswerController POST /wrong-answers/{id}/resolve
 
     @Transactional(readOnly = true)
     public Map<String, Object> explainWithAi(Long userId, Long questionId, QuizAiExplainRequest req) {

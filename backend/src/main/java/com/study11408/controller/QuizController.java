@@ -63,14 +63,8 @@ public class QuizController {
         return ApiResponse.ok(quizService.getWrongAnswers(userId));
     }
 
-    @Operation(summary = "标记错题为已解决（幂等）")
-    @PutMapping("/wrong-answers/{wrongAnswerId}/resolve")
-    public ApiResponse<WrongAnswerDTO> resolveWrongAnswer(
-            HttpServletRequest request,
-            @PathVariable Long wrongAnswerId) {
-        Long userId = getUserId(request);
-        return ApiResponse.ok(quizService.markWrongAnswerResolved(userId, wrongAnswerId));
-    }
+    // 删除：PUT /quiz/wrong-answers/{id}/resolve（前端已统一走 POST /wrong-answers/{id}/resolve
+    // by WrongAnswerController，本端点已无调用方）
 
     @Operation(summary = "AI 启发式讲题")
     @PostMapping("/{questionId}/ai-explain")
