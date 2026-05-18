@@ -35,9 +35,10 @@ class KnowledgePoint(BaseModel):
 
 
 class ExtractionRequest(BaseModel):
-    text: str
-    subject: Optional[str] = None
-    topic: Optional[str] = None
+    # 50KB 文本上限 - 一次 LLM 调用够用, 超过得分多次, 防止单次刷大量 token
+    text: str = Field(..., max_length=50000)
+    subject: Optional[str] = Field(default=None, max_length=100)
+    topic: Optional[str] = Field(default=None, max_length=200)
 
 
 class ExtractionResponse(BaseModel):
@@ -46,8 +47,8 @@ class ExtractionResponse(BaseModel):
 
 
 class KnowledgePointBrief(BaseModel):
-    title: str
-    content: str
+    title: str = Field(..., max_length=300)
+    content: str = Field(..., max_length=5000)
 
 
 class RelationRequest(BaseModel):
@@ -65,8 +66,8 @@ class EnhanceType(str, Enum):
 
 
 class EnhanceRequest(BaseModel):
-    title: str
-    content: str
+    title: str = Field(..., max_length=300)
+    content: str = Field(..., max_length=10000)
     enhance_type: EnhanceType
 
 

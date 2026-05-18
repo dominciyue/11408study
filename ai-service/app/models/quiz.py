@@ -11,11 +11,11 @@ class QuestionType(str, Enum):
 
 
 class QuizGenerateRequest(BaseModel):
-    knowledge_title: str
-    knowledge_content: str
+    knowledge_title: str = Field(..., max_length=300)
+    knowledge_content: str = Field(..., max_length=10000)
     question_type: QuestionType
     count: int = Field(default=3, ge=1, le=20)
-    difficulty: Optional[str] = None
+    difficulty: Optional[str] = Field(default=None, max_length=20)
 
 
 class QuizQuestion(BaseModel):

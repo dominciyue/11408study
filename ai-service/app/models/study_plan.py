@@ -8,19 +8,19 @@ from pydantic import BaseModel, Field
 class StudyPlanRequest(BaseModel):
     """用户提交的学习计划生成请求。"""
 
-    goal: str = Field(..., description="用户目标，如\"考 408，目标 130 分\"")
+    goal: str = Field(..., max_length=500, description="用户目标，如\"考 408，目标 130 分\"")
     weeks: int = Field(..., ge=1, le=52, description="计划跨度，单位周（1-52）")
     subject_name: Optional[str] = Field(
-        None, description="学科名（如\"408 计算机专业基础\"）"
+        default=None, max_length=100, description="学科名（如\"408 计算机专业基础\"）"
     )
     weak_topics: Optional[list[str]] = Field(
-        None, description="用户薄弱主题名（用于针对性安排复习）"
+        default=None, max_length=30, description="用户薄弱主题名（用于针对性安排复习）"
     )
     studied_nodes: Optional[int] = Field(
-        None, description="已学知识点总数（用于估计基础水平）"
+        default=None, ge=0, description="已学知识点总数（用于估计基础水平）"
     )
     total_nodes: Optional[int] = Field(
-        None, description="知识点总数（用于估计剩余进度）"
+        default=None, ge=0, description="知识点总数（用于估计剩余进度）"
     )
 
 

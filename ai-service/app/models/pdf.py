@@ -1,11 +1,11 @@
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class PDFParseRequest(BaseModel):
-    file_url: str
-    subject: Optional[str] = None
+    file_url: str = Field(..., max_length=2000)
+    subject: Optional[str] = Field(default=None, max_length=100)
 
 
 class PDFChunk(BaseModel):
