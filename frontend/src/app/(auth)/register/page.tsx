@@ -39,8 +39,8 @@ export default function RegisterPage() {
       setLocalError("两次输入的密码不一致");
       return;
     }
-    if (form.password.length < 6) {
-      setLocalError("密码长度至少6位");
+    if (form.password.length < 8) {
+      setLocalError("密码长度至少 8 位");
       return;
     }
 
@@ -89,9 +89,11 @@ export default function RegisterPage() {
               <label className="text-sm font-medium text-gray-300">用户名</label>
               <Input
                 type="text"
-                placeholder="请输入用户名"
+                placeholder="3-50 个字符"
                 value={form.username}
                 onChange={(e) => updateField("username", e.target.value)}
+                minLength={3}
+                maxLength={50}
                 required
               />
             </div>
@@ -120,7 +122,7 @@ export default function RegisterPage() {
               <div className="relative">
                 <Input
                   type={showPassword ? "text" : "password"}
-                  placeholder="请输入密码（至少6位）"
+                  placeholder="请输入密码(至少 8 位)"
                   value={form.password}
                   onChange={(e) => updateField("password", e.target.value)}
                   required

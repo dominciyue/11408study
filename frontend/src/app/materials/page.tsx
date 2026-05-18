@@ -56,6 +56,8 @@ export default function MaterialsPage() {
   const [subjectId, setSubjectId] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [showFilter, setShowFilter] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -84,6 +86,9 @@ export default function MaterialsPage() {
   }, [items, query]);
 
   async function uploadFile(file: File) {
+    if (isUploading) return;  // 防快速重复点击/拖拽
+    setIsUploading(true);
+    setUploadError(null);
     const form = new FormData();
     form.append("file", file);
     form.append("title", file.name);
@@ -91,9 +96,13 @@ export default function MaterialsPage() {
       const res = await materialsApi.upload(form);
       setItems((prev) => [res.data, ...prev]);
     } catch (e: unknown) {
-      // 后端返回 413 / 500 等都走这里；不再静默失败
+      // 后端返回 413 / 415 / 500 等都走这里;改为 inline error,不再阻塞 UI
       const msg = (e as { message?: string })?.message || "上传失败";
-      window.alert(msg);
+      setUploadError(msg);
+    } finally {
+      setIsUploading(false);
+      // 清空 input value 让用户能重新选同一个文件再传
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   }
 
@@ -107,9 +116,13 @@ export default function MaterialsPage() {
           </h1>
           <p className="text-gray-400 mt-1">上传和管理你的学习资料</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => fileInputRef.current?.click()}>
+        <Button
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+        >
           <Plus className="w-4 h-4 mr-2" />
-          添加资料
+          {isUploading ? "上传中…" : "添加资料"}
         </Button>
         <input
           ref={fileInputRef}
@@ -142,11 +155,21 @@ export default function MaterialsPage() {
             <Upload className="w-8 h-8 text-blue-400" />
           </div>
           <p className="text-gray-300 font-medium mb-1">拖拽文件到此处上传</p>
-          <p className="text-sm text-gray-500 mb-4">支持 PDF、Word、图片等格式，单文件最大 100MB</p>
-          <Button variant="outline" className="border-white/[0.08]" onClick={() => fileInputRef.current?.click()}>
+          <p className="text-sm text-gray-500 mb-4">支持 PDF、Word、图片等格式,单文件最大 50MB</p>
+          <Button
+            variant="outline"
+            className="border-white/[0.08]"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+          >
             <Upload className="w-4 h-4 mr-2" />
-            选择文件
+            {isUploading ? "上传中…" : "选择文件"}
           </Button>
+          {uploadError && (
+            <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+              {uploadError}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -335,7 +358,7 @@ export default function MaterialsPage() {
                         setItems((prev) => prev.filter((x) => x.id !== material.id));
                       } catch (e: unknown) {
                         const msg = (e as { message?: string })?.message || "删除失败";
-                        window.alert(msg);
+                        setUploadError(msg);
                       }
                     }}
                   >

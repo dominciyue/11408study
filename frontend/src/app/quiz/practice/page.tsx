@@ -80,6 +80,8 @@ function QuizPracticeInner() {
   const [isLoading, setIsLoading] = useState(true);
   const [aiOpen, setAiOpen] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(timedFlag ? TIMED_PER_QUESTION : null);
+  // 提交错误反馈(429/500/网络故障等), 之前是静默 catch 用户没感知
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // 用 ref 保留最新 selected/result，避免 setInterval 闭包过期
   const selectedRef = useRef<string | null>(null);
@@ -187,9 +189,13 @@ function QuizPracticeInner() {
       const userAnswer = selectedRef.current ?? (auto ? "(超时未作答)" : null);
       if (userAnswer == null) return;
       submittingRef.current = true;
+      setSubmitError(null);
       try {
         const res = await quizApi.submit({ questionId: q.id, userAnswer });
         setResult(res.data);
+      } catch (e: unknown) {
+        const msg = (e as { message?: string })?.message || "提交失败,请检查网络后重试";
+        setSubmitError(msg);
       } finally {
         submittingRef.current = false;
       }
@@ -206,10 +212,14 @@ function QuizPracticeInner() {
       if (resultRef.current) return;
       const userAnswer = markCorrect ? "EXT_CORRECT" : "EXT_WRONG";
       submittingRef.current = true;
+      setSubmitError(null);
       try {
         setSelected(userAnswer);
         const res = await quizApi.submit({ questionId: q.id, userAnswer });
         setResult(res.data);
+      } catch (e: unknown) {
+        const msg = (e as { message?: string })?.message || "提交失败,请检查网络后重试";
+        setSubmitError(msg);
       } finally {
         submittingRef.current = false;
       }
@@ -217,10 +227,11 @@ function QuizPracticeInner() {
     [q]
   );
 
-  // 切题时重置 timer / 选项 / 结果
+  // 切题时重置 timer / 选项 / 结果 / 错误提示
   useEffect(() => {
     setSelected(null);
     setResult(null);
+    setSubmitError(null);
     if (timedFlag) setTimeLeft(TIMED_PER_QUESTION);
     else setTimeLeft(null);
   }, [idx, timedFlag]);
@@ -396,6 +407,12 @@ function QuizPracticeInner() {
                       重选
                     </Button>
                   </div>
+
+                  {submitError ? (
+                    <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                      {submitError}
+                    </div>
+                  ) : null}
 
                   {result ? (
                     <div className="p-4 rounded-xl border border-white/[0.08] bg-white/5 space-y-2">
