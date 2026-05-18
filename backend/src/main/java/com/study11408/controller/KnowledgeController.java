@@ -48,8 +48,12 @@ public class KnowledgeController {
 
     @Operation(summary = "创建知识节点")
     @PostMapping("/nodes")
-    public ApiResponse<KnowledgeNodeDTO> createNode(@Valid @RequestBody CreateNodeRequest request) {
-        return ApiResponse.ok(knowledgeGraphService.createNode(request));
+    public ApiResponse<KnowledgeNodeDTO> createNode(
+            HttpServletRequest request,
+            @Valid @RequestBody CreateNodeRequest body) {
+        Long userId = jwtTokenProvider.getUserId(jwtTokenProvider.resolveToken(request));
+        aiRateLimiter.check(userId);  // 防止恶意刷节点污染图谱(节点不是 AI 调用但限频复用)
+        return ApiResponse.ok(knowledgeGraphService.createNode(body));
     }
 
     @Operation(summary = "更新知识节点（仅管理员）")
