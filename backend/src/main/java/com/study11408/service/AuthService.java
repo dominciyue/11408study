@@ -83,6 +83,24 @@ public class AuthService {
         }
     }
 
+    // 频率计数是 best-effort - Redis 临时不通也别让 auth 主流程变 500.
+    // 计数掉了顶多让锁定窗口的某次失败少算一次,远好过把"密码错"误报成"服务器内部错误"。
+    private void safeRecordFailure(String username, String remoteIp) {
+        try {
+            loginAttemptService.recordFailure(username, remoteIp);
+        } catch (Exception e) {
+            log.warn("recordFailure failed for {}: {}", username, e.toString());
+        }
+    }
+
+    private void safeRecordSuccess(String username, String remoteIp) {
+        try {
+            loginAttemptService.recordSuccess(username, remoteIp);
+        } catch (Exception e) {
+            log.warn("recordSuccess failed for {}: {}", username, e.toString());
+        }
+    }
+
     public AuthResponse login(LoginRequest request, String remoteIp) {
         requireTurnstile(request.getTurnstileToken(), remoteIp);
         if (loginAttemptService.isLocked(request.getUsername(), remoteIp)) {
@@ -93,12 +111,12 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
             User user = userRepository.findByUsername(request.getUsername())
                     .orElseThrow(() -> new BusinessException("用户不存在", HttpStatus.NOT_FOUND));
-            loginAttemptService.recordSuccess(request.getUsername(), remoteIp);
+            safeRecordSuccess(request.getUsername(), remoteIp);
             String token = jwtTokenProvider.generateToken(user.getUsername(), user.getId());
             String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUsername());
             return AuthResponse.builder().token(token).refreshToken(refreshToken).user(toUserDTO(user)).build();
         } catch (org.springframework.security.core.AuthenticationException ex) {
-            loginAttemptService.recordFailure(request.getUsername(), remoteIp);
+            safeRecordFailure(request.getUsername(), remoteIp);
             throw new BusinessException("用户名或密码错误", HttpStatus.UNAUTHORIZED);
         }
     }
