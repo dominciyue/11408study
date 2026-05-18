@@ -34,6 +34,23 @@ public class MaterialService {
     private final UserRepository userRepository;
     private final MinioClient minioClient;
 
+    private static final java.util.Set<String> ALLOWED_MIME = java.util.Set.of(
+        "application/pdf",
+        "image/jpeg", "image/png", "image/webp", "image/gif",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+        "text/plain", "text/markdown"
+    );
+
+    private static final java.util.Set<String> ALLOWED_EXT = java.util.Set.of(
+        ".pdf", ".jpg", ".jpeg", ".png", ".webp", ".gif",
+        ".doc", ".docx", ".ppt", ".pptx", ".txt", ".md"
+    );
+
+    private static final long MAX_FILE_SIZE_BYTES = 50L * 1024 * 1024; // 50 MB
+
     @Value("${app.minio.bucket}")
     private String bucket;
 
@@ -42,6 +59,23 @@ public class MaterialService {
 
     @Transactional
     public Material uploadMaterial(MultipartFile file, String title, Long nodeId, Long uploaderId) {
+        // 1. 大小双层校验(Spring multipart 100MB 兜底, 这里业务层 50MB)
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("文件不能为空", HttpStatus.BAD_REQUEST);
+        }
+        if (file.getSize() > MAX_FILE_SIZE_BYTES) {
+            throw new BusinessException("文件超过 50MB 上限", HttpStatus.PAYLOAD_TOO_LARGE);
+        }
+        // 2. MIME 白名单(客户端可伪造 Content-Type, 但和扩展名双校验已经把
+        //    随便改 .exe 改成 .pdf 的常见攻击挡掉. 真要绕过得既改 MIME 又改后缀
+        //    再绕过浏览器/MIME 嗅探, 成本/收益不划算)
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_MIME.contains(contentType.toLowerCase())) {
+            throw new BusinessException(
+                "不支持的文件类型: " + contentType + " (仅允许 PDF / 图片 / Word / PPT / 文本)",
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        }
+
         // 先校验依赖，避免 MinIO put 成功后才发现用户/节点不存在 → 孤儿对象
         User uploader = userRepository.findById(uploaderId)
                 .orElseThrow(() -> new BusinessException("用户不存在", HttpStatus.NOT_FOUND));
@@ -53,8 +87,13 @@ public class MaterialService {
 
         String originalName = file.getOriginalFilename();
         String extension = originalName != null && originalName.contains(".")
-                ? originalName.substring(originalName.lastIndexOf("."))
+                ? originalName.substring(originalName.lastIndexOf(".")).toLowerCase()
                 : "";
+        if (!ALLOWED_EXT.contains(extension)) {
+            throw new BusinessException(
+                "不支持的文件扩展名: " + extension,
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        }
         String objectName = UUID.randomUUID() + extension;
 
         try {
