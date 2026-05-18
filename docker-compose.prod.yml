@@ -1,0 +1,68 @@
+# 生产覆盖文件。用法:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# 这一层做四件事:
+#   1. 删除所有非 nginx 的 host 端口暴露(防止 5432/6379/9000/8080 等被公网直接打)
+#   2. 给所有服务加 restart: unless-stopped
+#   3. nginx 暴露 80/443 + 挂载证书与 webroot
+#   4. 前端构建带上 NEXT_PUBLIC_TURNSTILE_SITE_KEY(实际值从根 .env 读)
+#
+# nginx 块使用 YAML 多文档语法(--- 分隔)绕开 Compose v2.21 不支持 !override
+# 的限制:第一个 doc 用 !reset [] 清掉 base 里的 18081:80,第二个 doc 把
+# 80/443 加回来。这种写法在 v2.21+ 上 docker compose config 验证通过。
+
+services:
+  postgres:
+    ports: !reset []
+    restart: unless-stopped
+
+  redis:
+    ports: !reset []
+    restart: unless-stopped
+
+  minio:
+    ports: !reset []
+    restart: unless-stopped
+
+  ai-service:
+    ports: !reset []
+    restart: unless-stopped
+
+  backend:
+    restart: unless-stopped
+
+  frontend:
+    ports: !reset []
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports: !reset []
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/letsencrypt:ro
+      - ./nginx/webroot:/var/www/certbot:ro
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+      - ai-service
+
+  prometheus:
+    restart: unless-stopped
+
+  grafana:
+    restart: unless-stopped
+
+  loki:
+    restart: unless-stopped
+
+  promtail:
+    restart: unless-stopped
+---
+# 第二个 YAML 文档:在 !reset 之后把 nginx 的 80/443 加回来。
+services:
+  nginx:
+    ports:
+      - "80:80"
+      - "443:443"
