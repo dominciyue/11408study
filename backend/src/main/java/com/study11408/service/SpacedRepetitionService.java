@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -107,8 +108,13 @@ public class SpacedRepetitionService {
      * <p>调用方应已校验 userId / nodeId 的合法性；本方法只做存在性容错。
      * <p>遇 OptimisticLockException 重试 1 次，再失败仅 log.warn 不抛——
      * 不能因为入队失败阻塞答题主流程。
+     *
+     * <p><b>REQUIRES_NEW</b>：必须开新事务。否则 enqueue 内部一旦抛 BusinessException
+     * (RuntimeException 子类)，会把外层 QuizService.submitAnswer 的主事务标 rollback-only，
+     * 即便 WrongAnswerService 在外层 catch 掉异常，提交时仍会 TxnAbort 失败，
+     * 整个答题流程变成 500。
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void enqueueWrongQuestion(Long userId, Long nodeId) {
         if (userId == null || nodeId == null) {
             log.warn("enqueueWrongQuestion called with null param userId={} nodeId={}", userId, nodeId);

@@ -335,6 +335,7 @@ public class StatsService {
      * </ul>
      * 数据量：用户进度行通常 ≤ 1000，topic ≤ 80，O(N) in-memory 完全没问题。
      */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public WeaknessRadarResponse getWeaknessRadar(Long userId) {
         // 一次性拉所有 progress + node + topic + subject（已有 FETCH JOIN）
         List<StudyProgress> progress = progressRepository.findByUserIdWithNodeSubject(userId);
@@ -349,11 +350,18 @@ public class StatsService {
 
         // 全部学科（无论用户是否有进度都展示，便于雷达图 4 轴完整）
         List<Subject> subjects = subjectRepository.findAllByOrderBySortOrderAsc();
-        // 学科节点总数（一次查所有 node 再分组）
-        Map<Long, Long> nodeCountBySubject = nodeRepository.findAll().stream()
+
+        // 单次 findAll() 同时算 nodeCountBySubject + nodeCountByTopic，避免 2 次全表扫
+        List<com.study11408.entity.KnowledgeNode> allNodes = nodeRepository.findAll();
+        Map<Long, Long> nodeCountBySubject = allNodes.stream()
                 .filter(n -> n.getTopic() != null && n.getTopic().getSubject() != null)
                 .collect(Collectors.groupingBy(
                         n -> n.getTopic().getSubject().getId(),
+                        Collectors.counting()));
+        Map<Long, Long> nodeCountByTopic = allNodes.stream()
+                .filter(n -> n.getTopic() != null)
+                .collect(Collectors.groupingBy(
+                        n -> n.getTopic().getId(),
                         Collectors.counting()));
 
         List<WeaknessRadarResponse.SubjectMastery> subjectList = subjects.stream()
@@ -384,12 +392,7 @@ public class StatsService {
                 .filter(p -> p.getNode() != null && p.getNode().getTopic() != null)
                 .collect(Collectors.groupingBy(p -> p.getNode().getTopic().getId()));
 
-        // 一次查 topic 节点总数（用于 weak topic 表格的"节点数"列）
-        Map<Long, Long> nodeCountByTopic = nodeRepository.findAll().stream()
-                .filter(n -> n.getTopic() != null)
-                .collect(Collectors.groupingBy(
-                        n -> n.getTopic().getId(),
-                        Collectors.counting()));
+        // nodeCountByTopic 已在上面 allNodes 阶段算好，直接复用
 
         List<WeaknessRadarResponse.WeakTopic> weakTopics = byTopic.entrySet().stream()
                 .map(entry -> {

@@ -193,11 +193,6 @@ export const quizApi = {
       body,
       { timeout: 90000 } // LLM 调用 5-30s 不等，避免被默认 15s 超时截掉
     ),
-  resolveWrongAnswer: (wrongAnswerId: number) =>
-    api.put<unknown, ApiResponse<WrongAnswer>>(
-      `/quiz/wrong-answers/${wrongAnswerId}/resolve`,
-      null
-    ),
   generateForNode: (
     nodeId: number,
     opts?: { count?: number; type?: "CHOICE" | "TRUE_FALSE" | "FILL_BLANK"; difficulty?: string }
@@ -265,9 +260,9 @@ export const statsApi = {
 };
 
 // ─── 错题闭环 (V14) ─────────────────────────────────────────────────────────
-// 注意：与已有的 quizApi.getWrongAnswers / quizApi.resolveWrongAnswer 并存。
-// 新 endpoint /wrong-answers/* 返回按 node 聚合的 group 结构，支持相似题与
-// "已掌握" 闭环；旧 /quiz/wrong-answers 返回平铺列表，保留以兼容历史调用。
+// 与 quizApi.getWrongAnswers 并存：旧 /quiz/wrong-answers 返回平铺列表（quiz 主页
+// 用来显示错题计数）；新 /wrong-answers/* 返回按 node 聚合的 group 结构，
+// 支持相似题与"已掌握"闭环（错题本页用）。
 export const wrongAnswersApi = {
   /** 按 node 聚合的错题本 */
   list: () =>

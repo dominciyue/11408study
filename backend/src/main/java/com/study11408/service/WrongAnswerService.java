@@ -172,32 +172,37 @@ public class WrongAnswerService {
         Set<Long> excludeIds = new HashSet<>();
         excludeIds.add(srcQuestion.getId());
 
-        // 第 1 档：同 node
-        List<QuizQuestion> bucket = new ArrayList<>(
-                quizQuestionRepository.findByNodeId(node.getId()));
-        bucket.removeIf(q -> excludeIds.contains(q.getId()));
+        // bucket 与 bucketIds 同步维护，把第 2/3 档的 O(N²) noneMatch 降到 O(1) Set 查询
+        List<QuizQuestion> bucket = new ArrayList<>();
+        Set<Long> bucketIds = new HashSet<>();
+        for (QuizQuestion q : quizQuestionRepository.findByNodeId(node.getId())) {
+            if (excludeIds.contains(q.getId())) continue;
+            if (bucketIds.add(q.getId())) bucket.add(q);
+        }
         String source = "DB_NODE";
 
         // 第 2 档：同 topic
         if (bucket.size() < limit && topicId != null) {
             for (QuizQuestion q : quizQuestionRepository.findByNodeTopicId(topicId)) {
-                if (!excludeIds.contains(q.getId()) && bucket.stream().noneMatch(b -> b.getId().equals(q.getId()))) {
+                if (excludeIds.contains(q.getId())) continue;
+                if (bucketIds.add(q.getId())) {
                     bucket.add(q);
-                    if (bucket.size() >= limit * 2) break;  // 多取些便于打乱
+                    if (bucket.size() >= limit * 2) break;
                 }
             }
-            if (bucket.size() > 0) source = "DB_TOPIC";
+            if (!bucket.isEmpty()) source = "DB_TOPIC";
         }
 
         // 第 3 档：同 subject
         if (bucket.size() < limit && subjectId != null) {
             for (QuizQuestion q : quizQuestionRepository.findByNodeTopicSubjectId(subjectId)) {
-                if (!excludeIds.contains(q.getId()) && bucket.stream().noneMatch(b -> b.getId().equals(q.getId()))) {
+                if (excludeIds.contains(q.getId())) continue;
+                if (bucketIds.add(q.getId())) {
                     bucket.add(q);
                     if (bucket.size() >= limit * 2) break;
                 }
             }
-            if (bucket.size() > 0) source = "DB_SUBJECT";
+            if (!bucket.isEmpty()) source = "DB_SUBJECT";
         }
 
         // 库内打乱后取前 limit
