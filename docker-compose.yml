@@ -45,8 +45,12 @@ services:
       APP_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
       APP_MINIO_BUCKET: ${MINIO_BUCKET:-study11408}
       APP_AI_SERVICE_URL: http://ai-service:8000
-      APP_JWT_SECRET: ${APP_JWT_SECRET:-c2VjdXJlLWtleS1mb3Itc3R1ZHkxMTQwOC1wbGF0Zm9ybS1qd3QtdG9rZW4tZ2VuZXJhdGlvbi0yMDI0LXZlcnktbG9uZy1zZWNyZXQta2V5LXN0cmluZw==}
-      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:18081}
+      # 关键密钥不给 compose 层 dev fallback - 否则 prod profile 里 application-prod.yml
+      # 的 ${APP_JWT_SECRET} 会被 compose 注入的 dev 串满足,绕过 fail-fast。
+      # 本地纯后端开发请用 `mvn spring-boot:run`(走 application.yml dev 默认),
+      # compose 路径必须显式提供 .env。
+      APP_JWT_SECRET: ${APP_JWT_SECRET:?run "openssl rand -base64 64 | tr -d \n" and add to .env}
+      APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:?set in .env, e.g. https://your-domain.com}
       TURNSTILE_ENABLED: ${TURNSTILE_ENABLED:-false}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
       MAIL_HOST: ${MAIL_HOST:-smtp.qq.com}
