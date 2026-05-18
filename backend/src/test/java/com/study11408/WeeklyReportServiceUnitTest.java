@@ -97,7 +97,11 @@ class WeeklyReportServiceUnitTest {
 
     @Test
     void days_active_counts_distinct_days_with_activity_in_window() {
-        // 7 天窗口里挑 3 天有 session（且 endTime 非空），其余 4 天无活动
+        // 7 天窗口里挑 3 天有 session（且 endTime 非空），其余 4 天无活动。
+        // 注意：commit ab28263 之后 studiedNodesThisWeek / reviewedNodesThisWeek
+        // 改为基于 StudyProgress.lastReview 计算（StudySession.studiedNodes 字段
+        // 从未被递增过，永远是 0）。本用例 progressList 为空 → 该两项应为 0。
+        // 真正的 studied/reviewed 计数交给 progress 维度的另一个用例验证。
         List<StudySession> sessions = List.of(
                 session(TODAY, 30, 1, 0),
                 session(TODAY.minusDays(1), 45, 2, 1),
@@ -110,8 +114,8 @@ class WeeklyReportServiceUnitTest {
 
         assertThat(r.getDaysActive()).isEqualTo(3);
         assertThat(r.getTotalMinutes()).isEqualTo(95L);
-        assertThat(r.getStudiedNodesThisWeek()).isEqualTo(3L);
-        assertThat(r.getReviewedNodesThisWeek()).isEqualTo(4L);
+        assertThat(r.getStudiedNodesThisWeek()).isEqualTo(0L);
+        assertThat(r.getReviewedNodesThisWeek()).isEqualTo(0L);
     }
 
     @Test

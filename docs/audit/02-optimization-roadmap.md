@@ -11,6 +11,28 @@
 
 ---
 
+## 📋 进度更新（追加）
+
+**2026-05-18：** 经过 11+ 轮审计 + 本日"错题闭环 + 弱点画像"专题会话，**P0 全部完成**，
+P1 部分完成（CORS / actuator / Swagger / AI key / AI 限流已做；监控 / 备份 / Provider 抽象 /
+prompt 缓存 / @Cacheable / 索引补齐 / multi-worker / N+1 部分项尚未做）。
+本日新增"错题闭环 + 弱点雷达图"对应 docs/research/competitive-analysis.md Top-1/Top-2 差距，
+不属于本 roadmap 既定项，但显著提升学习效果维度。详见 docs/dev-log/2026-05-18-autonomous-session.md。
+
+**已 done 的项**（按 commit 推断）：
+- P0-01 ~ P0-13：全部完成（见早期 commits c402fd8 / a6f4231 / 2db6d58 等）
+- P1-05 部分：V14 加 2 个针对性索引（错题闭环用）
+- P1-09 部分：AiRateLimiter in-memory bucket 30/min/user（八轮审计）
+- P2-07 done：refresh token type=refresh 校验（c402fd8）
+
+**下一会话候选**（按价值排序）：
+1. FSRS-5 算法升级（取代 SM-2 — 学习算法本质提升）
+2. P1-01 监控栈 + P1-02 备份脚本（生产成熟度）
+3. P1-04 Prompt Redis 缓存 + P1-12 @Cacheable（成本降低）
+4. WeeklyReportServiceUnitTest pre-existing fail + 测试覆盖到 70%（CI 信号）
+
+---
+
 ## 1. 阶段总览
 
 | 阶段 | 范围 | 估工作量 | 推荐周期 |
