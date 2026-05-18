@@ -2,6 +2,9 @@
 
 import { Turnstile } from "@marsidev/react-turnstile";
 
+// 单一来源:父组件 disabled 守卫直接复用,避免三处重复 env 读取。
+export const TURNSTILE_ENABLED = !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
 interface Props {
   onToken: (token: string) => void;
   onExpire?: () => void;

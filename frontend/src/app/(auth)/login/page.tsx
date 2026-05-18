@@ -7,7 +7,7 @@ import { GraduationCap, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { TurnstileWidget, TURNSTILE_ENABLED } from "@/components/TurnstileWidget";
 import { useAuthStore } from "@/stores/auth-store";
 
 function LoginInner() {
@@ -93,7 +93,7 @@ function LoginInner() {
             <Button
               type="submit"
               className="w-full"
-              disabled={isLoading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)}
+              disabled={isLoading || (TURNSTILE_ENABLED && !turnstileToken)}
             >
               {isLoading ? "登录中..." : "登录"}
             </Button>

@@ -7,7 +7,7 @@ import { GraduationCap, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { TurnstileWidget } from "@/components/TurnstileWidget";
+import { TurnstileWidget, TURNSTILE_ENABLED } from "@/components/TurnstileWidget";
 import { EmailCodeInput } from "@/components/EmailCodeInput";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -150,8 +150,8 @@ export default function RegisterPage() {
               className="w-full"
               disabled={
                 isLoading ||
-                !emailCode ||
-                (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)
+                emailCode.length !== 6 ||
+                (TURNSTILE_ENABLED && !turnstileToken)
               }
             >
               {isLoading ? "注册中..." : "注册"}
