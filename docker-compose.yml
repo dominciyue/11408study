@@ -59,6 +59,8 @@ services:
       - ./ai-service/.env
     environment:
       DEBUG: "false"
+      # Instrumentator should_respect_env_var=True 时必须显式打开
+      PROMETHEUS_ENABLED: "true"
     ports:
       - "8000:8000"
 
