@@ -22,6 +22,7 @@ export interface PageResponse<T> {
 export interface LoginRequest {
   username: string;
   password: string;
+  turnstileToken?: string;
 }
 
 export interface RegisterRequest {
@@ -29,6 +30,8 @@ export interface RegisterRequest {
   password: string;
   email: string;
   nickname?: string;
+  emailCode: string;
+  turnstileToken?: string;
 }
 
 export interface AuthResponse {

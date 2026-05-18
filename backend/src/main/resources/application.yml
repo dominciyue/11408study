@@ -49,11 +49,27 @@ spring:
     redis:
       time-to-live: 3600000
 
+  mail:
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:465}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.ssl.enable: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+
 app:
   jwt:
     secret: c2VjdXJlLWtleS1mb3Itc3R1ZHkxMTQwOC1wbGF0Zm9ybS1qd3QtdG9rZW4tZ2VuZXJhdGlvbi0yMDI0LXZlcnktbG9uZy1zZWNyZXQta2V5LXN0cmluZw==
     expiration: 86400000
     refresh-expiration: 604800000
+
+  mail:
+    from: ${MAIL_FROM:${spring.mail.username}}
+    from-name: ${MAIL_FROM_NAME:11408 学习平台}
 
   minio:
     endpoint: http://localhost:9000
@@ -63,6 +79,16 @@ app:
 
   ai:
     service-url: http://localhost:8000
+
+  turnstile:
+    secret-key: ${TURNSTILE_SECRET_KEY:}
+    # 设为 false 时跳过 Turnstile 校验(本地 dev 默认关掉,生产必须打开)
+    enabled: ${TURNSTILE_ENABLED:false}
+    verify-url: https://challenges.cloudflare.com/turnstile/v0/siteverify
+
+  login:
+    max-attempts: ${LOGIN_MAX_ATTEMPTS:5}
+    lock-minutes: ${LOGIN_LOCK_MINUTES:15}
 
 springdoc:
   api-docs:
@@ -89,6 +115,9 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+  health:
+    mail:
+      enabled: false
   prometheus:
     metrics:
       export:

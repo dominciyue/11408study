@@ -22,7 +22,21 @@ public class JwtTokenProvider {
             @Value("${app.jwt.secret}") String secret,
             @Value("${app.jwt.expiration}") long expiration,
             @Value("${app.jwt.refresh-expiration}") long refreshExpiration) {
-        this.key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                "app.jwt.secret 未配置 — prod 模式必须通过 APP_JWT_SECRET 环境变量注入(openssl rand -base64 64)");
+        }
+        byte[] decoded;
+        try {
+            decoded = Decoders.BASE64.decode(secret);
+        } catch (io.jsonwebtoken.io.DecodingException | IllegalArgumentException e) {
+            throw new IllegalStateException("app.jwt.secret 不是合法的 Base64 字符串", e);
+        }
+        if (decoded.length < 32) {
+            throw new IllegalStateException(
+                "app.jwt.secret 解码后必须 ≥ 32 字节(HMAC-SHA256 最低要求);当前 " + decoded.length + " 字节");
+        }
+        this.key = Keys.hmacShaKeyFor(decoded);
         this.expiration = expiration;
         this.refreshExpiration = refreshExpiration;
     }

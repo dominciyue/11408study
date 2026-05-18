@@ -1,0 +1,4 @@
+# Let's Encrypt 证书内容 — 永远不要提交到仓库
+# 注意:忽略目录内文件,但保留目录本身(.gitkeep 留作占位)
+certs/*
+!certs/.gitkeep

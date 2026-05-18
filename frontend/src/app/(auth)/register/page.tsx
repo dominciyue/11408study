@@ -7,6 +7,8 @@ import { GraduationCap, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { TurnstileWidget, TURNSTILE_ENABLED } from "@/components/TurnstileWidget";
+import { EmailCodeInput } from "@/components/EmailCodeInput";
 import { useAuthStore } from "@/stores/auth-store";
 
 export default function RegisterPage() {
@@ -21,6 +23,8 @@ export default function RegisterPage() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [emailCode, setEmailCode] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   const updateField = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -46,6 +50,8 @@ export default function RegisterPage() {
         email: form.email,
         password: form.password,
         nickname: form.nickname || undefined,
+        emailCode,
+        turnstileToken,
       });
       router.push("/dashboard");
     } catch {
@@ -99,6 +105,7 @@ export default function RegisterPage() {
                 required
               />
             </div>
+            <EmailCodeInput email={form.email} value={emailCode} onChange={setEmailCode} />
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-300">昵称（选填）</label>
               <Input
@@ -137,7 +144,16 @@ export default function RegisterPage() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <TurnstileWidget onToken={setTurnstileToken} />
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={
+                isLoading ||
+                emailCode.length !== 6 ||
+                (TURNSTILE_ENABLED && !turnstileToken)
+              }
+            >
               {isLoading ? "注册中..." : "注册"}
             </Button>
           </form>
