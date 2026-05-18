@@ -7,6 +7,7 @@ import { GraduationCap, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { TurnstileWidget } from "@/components/TurnstileWidget";
 import { useAuthStore } from "@/stores/auth-store";
 
 function LoginInner() {
@@ -16,12 +17,13 @@ function LoginInner() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     try {
-      await login({ username, password });
+      await login({ username, password, turnstileToken });
       // 登录成功后回到原本想去的页面（route guard 写入 ?redirect=...），默认 /dashboard
       const redirect = searchParams.get("redirect");
       // 防开放重定向：只接受 / 开头且非 //（站内相对路径）
@@ -87,7 +89,12 @@ function LoginInner() {
                 </button>
               </div>
             </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <TurnstileWidget onToken={setTurnstileToken} />
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading || (!!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && !turnstileToken)}
+            >
               {isLoading ? "登录中..." : "登录"}
             </Button>
           </form>
