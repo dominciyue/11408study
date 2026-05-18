@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.study11408.security.JwtTokenProvider;
 import com.study11408.service.EmailService;
+import com.study11408.service.LoginAttemptService;
 import com.study11408.service.VerificationCodeService;
 import com.study11408.testsupport.AbstractIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,11 +43,13 @@ class AuthIntegrationIT extends AbstractIntegrationTest {
     @MockBean VerificationCodeService verificationCodeService;
     @MockBean EmailService emailService;
     @MockBean private com.study11408.service.TurnstileService turnstileService;
+    @MockBean LoginAttemptService loginAttemptService;
 
     @BeforeEach
     void stubEmailVerification() {
         given(verificationCodeService.verifyAndConsume(any(), any())).willReturn(true);
         given(turnstileService.verify(any(), any())).willReturn(true);
+        // Default @MockBean: isLocked returns false (Boolean default), record* no-op.
     }
 
     @Test

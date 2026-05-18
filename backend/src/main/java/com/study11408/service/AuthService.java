@@ -33,6 +33,7 @@ public class AuthService {
     private final EmailService emailService;
     private final StringRedisTemplate stringRedisTemplate;
     private final TurnstileService turnstileService;
+    private final LoginAttemptService loginAttemptService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request, String remoteIp) {
@@ -84,20 +85,22 @@ public class AuthService {
 
     public AuthResponse login(LoginRequest request, String remoteIp) {
         requireTurnstile(request.getTurnstileToken(), remoteIp);
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
-
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new BusinessException("用户不存在", HttpStatus.NOT_FOUND));
-
-        String token = jwtTokenProvider.generateToken(user.getUsername(), user.getId());
-        String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUsername());
-
-        return AuthResponse.builder()
-                .token(token)
-                .refreshToken(refreshToken)
-                .user(toUserDTO(user))
-                .build();
+        if (loginAttemptService.isLocked(request.getUsername(), remoteIp)) {
+            throw new BusinessException("登录失败次数过多,请 15 分钟后再试", HttpStatus.TOO_MANY_REQUESTS);
+        }
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
+            User user = userRepository.findByUsername(request.getUsername())
+                    .orElseThrow(() -> new BusinessException("用户不存在", HttpStatus.NOT_FOUND));
+            loginAttemptService.recordSuccess(request.getUsername(), remoteIp);
+            String token = jwtTokenProvider.generateToken(user.getUsername(), user.getId());
+            String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUsername());
+            return AuthResponse.builder().token(token).refreshToken(refreshToken).user(toUserDTO(user)).build();
+        } catch (org.springframework.security.core.AuthenticationException ex) {
+            loginAttemptService.recordFailure(request.getUsername(), remoteIp);
+            throw new BusinessException("用户名或密码错误", HttpStatus.UNAUTHORIZED);
+        }
     }
 
     public AuthResponse refreshToken(String refreshToken) {
