@@ -21,6 +21,13 @@ public class AuthController {
     private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
 
+    @Operation(summary = "发送邮箱注册验证码")
+    @PostMapping("/send-email-code")
+    public ApiResponse<Void> sendEmailCode(@Valid @RequestBody SendEmailCodeRequest request) {
+        authService.sendEmailCode(request.getEmail());
+        return ApiResponse.ok(null);
+    }
+
     @Operation(summary = "用户注册")
     @PostMapping("/register")
     public ApiResponse<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {

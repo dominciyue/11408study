@@ -38,7 +38,7 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                 // 仅 login / register / refresh 公开；/me 必须带 JWT
-                .requestMatchers("/auth/login", "/auth/register", "/auth/refresh").permitAll()
+                .requestMatchers("/auth/login", "/auth/register", "/auth/refresh", "/auth/send-email-code").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/v3/api-docs/**").permitAll()
                 // P0-11 收紧：health/info/prometheus 公开（health 由前端拉、

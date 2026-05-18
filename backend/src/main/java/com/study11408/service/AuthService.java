@@ -22,34 +22,40 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final AuthenticationManager authenticationManager;
+    private final VerificationCodeService verificationCodeService;
+    private final EmailService emailService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
+        if (!verificationCodeService.verifyAndConsume(request.getEmail(), request.getEmailCode())) {
+            throw new BusinessException("邮箱验证码错误或已过期");
+        }
         if (userRepository.existsByUsername(request.getUsername())) {
             throw new BusinessException("用户名已存在");
         }
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BusinessException("邮箱已被注册");
         }
-
         User user = User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .nickname(request.getNickname() != null ? request.getNickname() : request.getUsername())
                 .role("USER")
+                .emailVerified(true)
                 .build();
-
         user = userRepository.save(user);
-
         String token = jwtTokenProvider.generateToken(user.getUsername(), user.getId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getUsername());
+        return AuthResponse.builder().token(token).refreshToken(refreshToken).user(toUserDTO(user)).build();
+    }
 
-        return AuthResponse.builder()
-                .token(token)
-                .refreshToken(refreshToken)
-                .user(toUserDTO(user))
-                .build();
+    public void sendEmailCode(String email) {
+        if (userRepository.existsByEmail(email)) {
+            throw new BusinessException("邮箱已被注册");
+        }
+        String code = verificationCodeService.generateAndStore(email);
+        emailService.sendVerificationCode(email, code);
     }
 
     public AuthResponse login(LoginRequest request) {
