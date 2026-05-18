@@ -65,6 +65,8 @@ export const authApi = {
     api.post<unknown, ApiResponse<AuthResponse>>("/auth/register", data),
   refresh: (refreshToken: string) =>
     api.post<unknown, ApiResponse<AuthResponse>>("/auth/refresh", { refreshToken }),
+  sendEmailCode: (email: string) =>
+    api.post<unknown, ApiResponse<null>>("/auth/send-email-code", { email }),
   me: () => api.get<unknown, ApiResponse<User>>("/auth/me"),
 };
 
