@@ -100,7 +100,9 @@ public class WrongAnswerService {
     /** 错题本：按 node 聚合，含错误次数、最近答错时间、是否已入队。 */
     @Transactional(readOnly = true)
     public List<WrongAnswerGroupDTO> listGroupedByNode(Long userId) {
-        List<WrongAnswer> open = wrongAnswerRepository.findByUserIdAndResolvedFalse(userId);
+        // FETCH JOIN 一次性拉 question + node + topic + subject，避免后续 stream 中
+        // 每条 w.getQuestion().getNode()... 触发 N+1
+        List<WrongAnswer> open = wrongAnswerRepository.findOpenWithGraph(userId);
         if (open.isEmpty()) return List.of();
 
         // 按 nodeId 分组（无 nodeId 的题归入 -1L 桶）

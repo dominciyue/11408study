@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Activity, ChevronDown, ChevronRight, Target } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -25,6 +26,7 @@ import type { WeaknessRadarResponse } from "@/types";
  * 该组件自身负责拉数据 + loading / error，调用方只需 <WeaknessRadarCard/>。
  */
 export function WeaknessRadarCard() {
+  const router = useRouter();
   const [data, setData] = useState<WeaknessRadarResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
@@ -162,10 +164,22 @@ export function WeaknessRadarCard() {
                   <div className="mt-2 space-y-2">
                     {weakTopics.map((t) => {
                       const pct = Math.max(0, Math.min(100, Math.round(t.mastery)));
+                      const clickable = !!t.subjectId;
                       return (
-                        <div
+                        <button
                           key={t.id}
-                          className="rounded-lg border border-white/[0.06] bg-white/[0.02] p-2.5"
+                          type="button"
+                          disabled={!clickable}
+                          onClick={() => {
+                            if (t.subjectId) router.push(`/subjects/${t.subjectId}`);
+                          }}
+                          className={
+                            "w-full text-left rounded-lg border border-white/[0.06] bg-white/[0.02] p-2.5 " +
+                            (clickable
+                              ? "hover:bg-white/[0.06] cursor-pointer transition-colors"
+                              : "cursor-default")
+                          }
+                          title={clickable ? `点击进入「${t.subjectName ?? ""}」学科页` : ""}
                         >
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-gray-200 truncate flex-1 mr-2">
@@ -182,7 +196,7 @@ export function WeaknessRadarCard() {
                             indicatorClassName="bg-orange-500"
                           />
                           <p className="text-[10px] text-gray-500 mt-1">{t.nodes} 个节点</p>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>

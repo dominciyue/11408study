@@ -42,6 +42,8 @@ public class WeaknessRadarResponse {
     public static class WeakTopic {
         private Long id;
         private String name;
+        /** 用于前端"点击跳学科页"的路由参数；与 subjectName 配对 */
+        private Long subjectId;
         private String subjectName;
         private double mastery;     // 该 topic 下所有节点 mastery_level 的均值
         private int nodes;

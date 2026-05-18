@@ -405,9 +405,11 @@ public class StatsService {
                             .orElse(0.0);
                     Topic t = ps.get(0).getNode().getTopic();
                     String subjectName = t.getSubject() != null ? t.getSubject().getName() : null;
+                    Long subjectId = t.getSubject() != null ? t.getSubject().getId() : null;
                     return WeaknessRadarResponse.WeakTopic.builder()
                             .id(topicId)
                             .name(t.getName())
+                            .subjectId(subjectId)
                             .subjectName(subjectName)
                             .mastery(Math.round(avg * 100.0) / 100.0)
                             .nodes(nodeCountByTopic.getOrDefault(topicId, 0L).intValue())

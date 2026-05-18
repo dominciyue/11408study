@@ -303,7 +303,7 @@ class WrongAnswerServiceUnitTest {
                 .answeredAt(LocalDateTime.now().minusHours(1))
                 .enqueuedAt(LocalDateTime.now())
                 .resolved(false).build();
-        when(wrongAnswerRepository.findByUserIdAndResolvedFalse(USER_ID))
+        when(wrongAnswerRepository.findOpenWithGraph(USER_ID))
                 .thenReturn(List.of(a, b));
 
         List<WrongAnswerGroupDTO> groups = service.listGroupedByNode(USER_ID);

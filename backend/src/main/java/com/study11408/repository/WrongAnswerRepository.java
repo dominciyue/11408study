@@ -18,6 +18,20 @@ public interface WrongAnswerRepository extends JpaRepository<WrongAnswer, Long> 
 
     List<WrongAnswer> findByUserIdAndResolvedFalse(Long userId);
 
+    /**
+     * 同上 + FETCH JOIN 把 question→node→topic→subject 一次性拉回，
+     * 避免 listGroupedByNode 时的 N+1 lazy proxy（每条触发 4 次额外 query）。
+     */
+    @Query("""
+            SELECT w FROM WrongAnswer w
+            LEFT JOIN FETCH w.question q
+            LEFT JOIN FETCH q.node n
+            LEFT JOIN FETCH n.topic t
+            LEFT JOIN FETCH t.subject s
+            WHERE w.userId = :userId AND w.resolved = false
+            """)
+    List<WrongAnswer> findOpenWithGraph(@Param("userId") Long userId);
+
     List<WrongAnswer> findByUserId(Long userId);
 
     Optional<WrongAnswer> findByIdAndUserId(Long id, Long userId);

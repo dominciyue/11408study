@@ -270,6 +270,8 @@ export interface SubjectMastery {
 export interface WeakTopic {
   id: number;
   name: string;
+  /** 用于"点击跳学科页"的路由参数 */
+  subjectId?: number;
   subjectName?: string;
   mastery: number; // 0-100
   nodes: number;
