@@ -1,18 +1,29 @@
 package com.study11408.service;
 
+import com.study11408.entity.KnowledgeNode;
 import com.study11408.entity.StudyProgress;
+import com.study11408.entity.User;
+import com.study11408.exception.BusinessException;
+import com.study11408.repository.KnowledgeNodeRepository;
 import com.study11408.repository.StudyProgressRepository;
+import com.study11408.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SpacedRepetitionService {
 
     private final StudyProgressRepository studyProgressRepository;
+    private final UserRepository userRepository;
+    private final KnowledgeNodeRepository knowledgeNodeRepository;
 
     /**
      * SM-2 algorithm (Piotr Wozniak, 1990).
@@ -87,5 +98,55 @@ public class SpacedRepetitionService {
                 + Math.min(repetitionCount / 10.0, 1.0) * 30
                 + ((easeFactor - 1.3) / 1.2) * 30;
         return (int) Math.min(Math.max(score, 0), 100);
+    }
+
+    /**
+     * 错题闭环 — 把指定 node 拨到 SM-2 复习队列。
+     * <p>语义：等价于一次 rating=0 的反馈（"完全忘了"），next_review = 明天，
+     * repetition_count 重置为 0；若 StudyProgress 还不存在则懒建。
+     * <p>调用方应已校验 userId / nodeId 的合法性；本方法只做存在性容错。
+     * <p>遇 OptimisticLockException 重试 1 次，再失败仅 log.warn 不抛——
+     * 不能因为入队失败阻塞答题主流程。
+     */
+    @Transactional
+    public void enqueueWrongQuestion(Long userId, Long nodeId) {
+        if (userId == null || nodeId == null) {
+            log.warn("enqueueWrongQuestion called with null param userId={} nodeId={}", userId, nodeId);
+            return;
+        }
+        try {
+            doEnqueue(userId, nodeId);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            log.warn("enqueueWrongQuestion optimistic lock conflict, retry once. uid={} node={}", userId, nodeId);
+            try {
+                doEnqueue(userId, nodeId);
+            } catch (Exception e2) {
+                log.warn("enqueueWrongQuestion retry failed, give up. uid={} node={} err={}",
+                        userId, nodeId, e2.getMessage());
+            }
+        }
+    }
+
+    private void doEnqueue(Long userId, Long nodeId) {
+        StudyProgress progress = studyProgressRepository
+                .findByUserIdAndNodeId(userId, nodeId)
+                .orElseGet(() -> createProgressShell(userId, nodeId));
+        processFeedback(progress, 0);  // rating=0 → next_review = 明天, repetition 重置
+    }
+
+    private StudyProgress createProgressShell(Long userId, Long nodeId) {
+        // 用户/节点不存在时直接抛 — 不可恢复的脏数据，应该由上层 catch 后告警
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException("用户不存在", HttpStatus.NOT_FOUND));
+        KnowledgeNode node = knowledgeNodeRepository.findById(nodeId)
+                .orElseThrow(() -> new BusinessException("节点不存在", HttpStatus.NOT_FOUND));
+        return studyProgressRepository.save(StudyProgress.builder()
+                .user(user)
+                .node(node)
+                .masteryLevel(0)
+                .repetitionCount(0)
+                .easeFactor(2.5)
+                .intervalDays(0)
+                .build());
     }
 }

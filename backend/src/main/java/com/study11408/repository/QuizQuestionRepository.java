@@ -19,4 +19,15 @@ public interface QuizQuestionRepository extends JpaRepository<QuizQuestion, Long
            nativeQuery = true)
     List<QuizQuestion> findRandomByNodeIds(@Param("nodeIds") List<Long> nodeIds,
                                            @Param("limit") int limit);
+
+    /**
+     * 相似题第二档：同 topic 下所有节点的题
+     * (第一档就是已有的 findByNodeId)
+     */
+    @Query("SELECT q FROM QuizQuestion q WHERE q.node.topic.id = :topicId")
+    List<QuizQuestion> findByNodeTopicId(@Param("topicId") Long topicId);
+
+    /** 相似题第三档：同 subject 下所有题 */
+    @Query("SELECT q FROM QuizQuestion q WHERE q.node.topic.subject.id = :subjectId")
+    List<QuizQuestion> findByNodeTopicSubjectId(@Param("subjectId") Long subjectId);
 }

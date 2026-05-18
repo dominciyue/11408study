@@ -43,4 +43,8 @@ public class WrongAnswer {
     @Builder.Default
     @Column(nullable = false)
     private Boolean resolved = false;
+
+    /** 已纳入 SM-2 复习队列的时刻；NULL = 尚未入队（同题第 1 次错误时记录但不入队） */
+    @Column(name = "enqueued_at")
+    private LocalDateTime enqueuedAt;
 }

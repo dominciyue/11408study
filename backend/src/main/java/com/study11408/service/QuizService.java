@@ -46,6 +46,7 @@ public class QuizService {
     private final ObjectMapper objectMapper;
     private final StudyProgressRepository progressRepository;
     private final KnowledgeNodeRepository nodeRepository;
+    private final WrongAnswerService wrongAnswerService;
 
     @Transactional(readOnly = true)
     public List<QuizQuestion> generateQuiz(List<Long> nodeIds, int count) {
@@ -328,14 +329,9 @@ public class QuizService {
         result.put("explanation", question.getExplanation());
 
         if (!correct) {
-            WrongAnswer wrongAnswer = WrongAnswer.builder()
-                    .user(user)
-                    .question(question)
-                    .userAnswer(request.getUserAnswer())
-                    .answeredAt(LocalDateTime.now())
-                    .resolved(false)
-                    .build();
-            wrongAnswerRepository.save(wrongAnswer);
+            // 错题闭环：累计错误次数，达阈值（默认 2 次）触发 SM-2 入复习队列。
+            // 内部已做 try/catch，入队失败不阻塞答题主流程。
+            wrongAnswerService.recordAndMaybeEnqueue(user, question, request.getUserAnswer());
         }
 
         return result;

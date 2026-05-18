@@ -4,9 +4,12 @@ import com.study11408.dto.BadgeDTO;
 import com.study11408.dto.DailyTaskDTO;
 import com.study11408.dto.StatsOverviewDTO;
 import com.study11408.dto.SubjectProgressDTO;
+import com.study11408.dto.WeaknessRadarResponse;
+import com.study11408.entity.KnowledgeNode;
 import com.study11408.entity.StudyProgress;
 import com.study11408.entity.StudySession;
 import com.study11408.entity.Subject;
+import com.study11408.entity.Topic;
 import com.study11408.entity.WrongAnswer;
 import com.study11408.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +30,7 @@ public class StatsService {
     private final WrongAnswerRepository wrongAnswerRepository;
     private final KnowledgeNodeRepository nodeRepository;
     private final SubjectRepository subjectRepository;
+    private final TopicRepository topicRepository;
 
     public Map<String, Object> getOverview(Long userId) {
         List<StudyProgress> progressList = progressRepository.findByUserId(userId);
@@ -318,5 +322,101 @@ public class StatsService {
         }).collect(Collectors.toList()));
 
         return result;
+    }
+
+    /**
+     * 弱点雷达图聚合 — Subject 维度 mastery（雷达图 4 轴）+ Top 10 弱 Topic（下钻表格）。
+     *
+     * <p>实现策略：通过两条 in-memory 聚合一次性算出，避免对 DB 做 N+1 GROUP BY。
+     * <ul>
+     *   <li>4 学科 mastery = AVG(study_progress.mastery_level) where node in subject</li>
+     *   <li>Top 10 弱 topic = AVG(study_progress.mastery_level) per topic，按 mastery ASC 取 10，
+     *       要求用户在该 topic 下至少学过 1 个 node（避免推荐未触达的 topic）</li>
+     * </ul>
+     * 数据量：用户进度行通常 ≤ 1000，topic ≤ 80，O(N) in-memory 完全没问题。
+     */
+    public WeaknessRadarResponse getWeaknessRadar(Long userId) {
+        // 一次性拉所有 progress + node + topic + subject（已有 FETCH JOIN）
+        List<StudyProgress> progress = progressRepository.findByUserIdWithNodeSubject(userId);
+
+        // 按 subject 分桶
+        Map<Long, List<StudyProgress>> bySubject = progress.stream()
+                .filter(p -> p.getNode() != null
+                        && p.getNode().getTopic() != null
+                        && p.getNode().getTopic().getSubject() != null)
+                .collect(Collectors.groupingBy(
+                        p -> p.getNode().getTopic().getSubject().getId()));
+
+        // 全部学科（无论用户是否有进度都展示，便于雷达图 4 轴完整）
+        List<Subject> subjects = subjectRepository.findAllByOrderBySortOrderAsc();
+        // 学科节点总数（一次查所有 node 再分组）
+        Map<Long, Long> nodeCountBySubject = nodeRepository.findAll().stream()
+                .filter(n -> n.getTopic() != null && n.getTopic().getSubject() != null)
+                .collect(Collectors.groupingBy(
+                        n -> n.getTopic().getSubject().getId(),
+                        Collectors.counting()));
+
+        List<WeaknessRadarResponse.SubjectMastery> subjectList = subjects.stream()
+                .map(s -> {
+                    List<StudyProgress> subjectProgress = bySubject.getOrDefault(s.getId(), List.of());
+                    double avg = subjectProgress.stream()
+                            .filter(p -> p.getMasteryLevel() != null)
+                            .mapToInt(StudyProgress::getMasteryLevel)
+                            .average()
+                            .orElse(0.0);
+                    long studied = subjectProgress.stream()
+                            .map(StudyProgress::getNodeId)
+                            .distinct()
+                            .count();
+                    return WeaknessRadarResponse.SubjectMastery.builder()
+                            .id(s.getId())
+                            .name(s.getName())
+                            .code(s.getCode())
+                            .mastery(Math.round(avg * 100.0) / 100.0)
+                            .nodes(nodeCountBySubject.getOrDefault(s.getId(), 0L).intValue())
+                            .studied((int) studied)
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        // Topic 维度：仅统计用户已学过节点的 topic
+        Map<Long, List<StudyProgress>> byTopic = progress.stream()
+                .filter(p -> p.getNode() != null && p.getNode().getTopic() != null)
+                .collect(Collectors.groupingBy(p -> p.getNode().getTopic().getId()));
+
+        // 一次查 topic 节点总数（用于 weak topic 表格的"节点数"列）
+        Map<Long, Long> nodeCountByTopic = nodeRepository.findAll().stream()
+                .filter(n -> n.getTopic() != null)
+                .collect(Collectors.groupingBy(
+                        n -> n.getTopic().getId(),
+                        Collectors.counting()));
+
+        List<WeaknessRadarResponse.WeakTopic> weakTopics = byTopic.entrySet().stream()
+                .map(entry -> {
+                    Long topicId = entry.getKey();
+                    List<StudyProgress> ps = entry.getValue();
+                    double avg = ps.stream()
+                            .filter(p -> p.getMasteryLevel() != null)
+                            .mapToInt(StudyProgress::getMasteryLevel)
+                            .average()
+                            .orElse(0.0);
+                    Topic t = ps.get(0).getNode().getTopic();
+                    String subjectName = t.getSubject() != null ? t.getSubject().getName() : null;
+                    return WeaknessRadarResponse.WeakTopic.builder()
+                            .id(topicId)
+                            .name(t.getName())
+                            .subjectName(subjectName)
+                            .mastery(Math.round(avg * 100.0) / 100.0)
+                            .nodes(nodeCountByTopic.getOrDefault(topicId, 0L).intValue())
+                            .build();
+                })
+                .sorted(Comparator.comparingDouble(WeaknessRadarResponse.WeakTopic::getMastery))
+                .limit(10)
+                .collect(Collectors.toList());
+
+        return WeaknessRadarResponse.builder()
+                .subjects(subjectList)
+                .weakTopics(weakTopics)
+                .build();
     }
 }

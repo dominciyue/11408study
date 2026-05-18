@@ -2,6 +2,7 @@ package com.study11408.controller;
 
 import com.study11408.dto.ApiResponse;
 import com.study11408.dto.StatsOverviewDTO;
+import com.study11408.dto.WeaknessRadarResponse;
 import com.study11408.dto.WeeklyReportDTO;
 import com.study11408.security.JwtTokenProvider;
 import com.study11408.service.StatsService;
@@ -46,6 +47,13 @@ public class StatsController {
     public ApiResponse<Map<String, Object>> getWeakness(HttpServletRequest request) {
         Long userId = getUserId(request);
         return ApiResponse.ok(statsService.getWeaknessAnalysis(userId));
+    }
+
+    @Operation(summary = "弱点雷达图 — Subject 4 轴 mastery + Top 10 弱 Topic")
+    @GetMapping("/weakness-radar")
+    public ApiResponse<WeaknessRadarResponse> getWeaknessRadar(HttpServletRequest request) {
+        Long userId = getUserId(request);
+        return ApiResponse.ok(statsService.getWeaknessRadar(userId));
     }
 
     @Operation(summary = "本周学习周报")
