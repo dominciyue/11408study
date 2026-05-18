@@ -13,6 +13,7 @@ import com.study11408.repository.UserRepository;
 import com.study11408.repository.WrongAnswerRepository;
 import com.study11408.service.AiClientService;
 import com.study11408.service.QuizService;
+import com.study11408.service.WrongAnswerService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,6 +59,7 @@ class QuizServiceSeedSubjectUnitTest {
     @Mock private AiClientService aiClientService;
     @Mock private StudyProgressRepository progressRepository;
     @Mock private KnowledgeNodeRepository nodeRepository;
+    @Mock private WrongAnswerService wrongAnswerService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private QuizService service;
@@ -66,7 +68,8 @@ class QuizServiceSeedSubjectUnitTest {
     void setup() {
         service = new QuizService(
                 questionRepository, wrongAnswerRepository, userRepository,
-                aiClientService, objectMapper, progressRepository, nodeRepository);
+                aiClientService, objectMapper, progressRepository, nodeRepository,
+                wrongAnswerService);
     }
 
     private static KnowledgeNode mkNode(long id, String title) {

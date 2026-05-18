@@ -11,6 +11,7 @@ import com.study11408.repository.UserRepository;
 import com.study11408.repository.WrongAnswerRepository;
 import com.study11408.service.AiClientService;
 import com.study11408.service.QuizService;
+import com.study11408.service.WrongAnswerService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,6 +56,7 @@ class QuizServiceGenerateForNodeUnitTest {
     @Mock private AiClientService aiClientService;
     @Mock private StudyProgressRepository progressRepository;
     @Mock private KnowledgeNodeRepository nodeRepository;
+    @Mock private WrongAnswerService wrongAnswerService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
     private QuizService service;
@@ -63,25 +65,28 @@ class QuizServiceGenerateForNodeUnitTest {
     void setup() {
         service = new QuizService(
                 questionRepository, wrongAnswerRepository, userRepository,
-                aiClientService, objectMapper, progressRepository, nodeRepository);
+                aiClientService, objectMapper, progressRepository, nodeRepository,
+                wrongAnswerService);
     }
 
     @Test
-    void should_return_error_when_count_zero_or_negative() {
-        Map<String, Object> r1 = service.generateAndSaveForNode(1L, 0, "CHOICE", null);
-        Map<String, Object> r2 = service.generateAndSaveForNode(1L, -3, "CHOICE", null);
-
-        assertThat(r1).containsEntry("generated", 0);
-        assertThat(r1.get("error")).asString().contains("count");
-        assertThat(r2.get("error")).asString().contains("count");
+    void should_throw_when_count_zero_or_negative() {
+        // 行为对齐 P1-bug：现在 count<=0 直接抛 BusinessException(BAD_REQUEST)，让前端拿到 400
+        // 比静默 return error map 更明确
+        assertThatThrownBy(() -> service.generateAndSaveForNode(1L, 0, "CHOICE", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("count");
+        assertThatThrownBy(() -> service.generateAndSaveForNode(1L, -3, "CHOICE", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("count");
         verify(aiClientService, never()).generateQuiz(any(), any(), any(), anyInt(), any());
     }
 
     @Test
-    void should_return_error_when_question_type_invalid() {
-        Map<String, Object> r = service.generateAndSaveForNode(1L, 5, "GIBBERISH", null);
-        assertThat(r).containsEntry("generated", 0);
-        assertThat(r.get("error")).asString().contains("CHOICE");
+    void should_throw_when_question_type_invalid() {
+        assertThatThrownBy(() -> service.generateAndSaveForNode(1L, 5, "GIBBERISH", null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("CHOICE");
         verify(aiClientService, never()).generateQuiz(any(), any(), any(), anyInt(), any());
     }
 
