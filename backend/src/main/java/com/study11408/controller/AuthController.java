@@ -21,6 +21,13 @@ public class AuthController {
     private final AuthService authService;
     private final JwtTokenProvider jwtTokenProvider;
 
+    private static String clientIp(HttpServletRequest req) {
+        String xff = req.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) return xff.split(",")[0].trim();
+        String real = req.getHeader("X-Real-IP");
+        return (real != null && !real.isBlank()) ? real : req.getRemoteAddr();
+    }
+
     @Operation(summary = "发送邮箱注册验证码")
     @PostMapping("/send-email-code")
     public ApiResponse<Void> sendEmailCode(@Valid @RequestBody SendEmailCodeRequest request) {
@@ -30,14 +37,14 @@ public class AuthController {
 
     @Operation(summary = "用户注册")
     @PostMapping("/register")
-    public ApiResponse<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
-        return ApiResponse.ok(authService.register(request));
+    public ApiResponse<AuthResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest req) {
+        return ApiResponse.ok(authService.register(request, clientIp(req)));
     }
 
     @Operation(summary = "用户登录")
     @PostMapping("/login")
-    public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ApiResponse.ok(authService.login(request));
+    public ApiResponse<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletRequest req) {
+        return ApiResponse.ok(authService.login(request, clientIp(req)));
     }
 
     @Operation(summary = "刷新令牌")

@@ -29,4 +29,6 @@ public class RegisterRequest {
     private String emailCode;
 
     private String nickname;
+
+    private String turnstileToken;
 }

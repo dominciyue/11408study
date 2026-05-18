@@ -41,10 +41,12 @@ class AuthIntegrationIT extends AbstractIntegrationTest {
 
     @MockBean VerificationCodeService verificationCodeService;
     @MockBean EmailService emailService;
+    @MockBean private com.study11408.service.TurnstileService turnstileService;
 
     @BeforeEach
     void stubEmailVerification() {
         given(verificationCodeService.verifyAndConsume(any(), any())).willReturn(true);
+        given(turnstileService.verify(any(), any())).willReturn(true);
     }
 
     @Test

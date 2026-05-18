@@ -32,9 +32,11 @@ public class AuthService {
     private final VerificationCodeService verificationCodeService;
     private final EmailService emailService;
     private final StringRedisTemplate stringRedisTemplate;
+    private final TurnstileService turnstileService;
 
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
+    public AuthResponse register(RegisterRequest request, String remoteIp) {
+        requireTurnstile(request.getTurnstileToken(), remoteIp);
         if (!verificationCodeService.verifyAndConsume(request.getEmail(), request.getEmailCode())) {
             throw new BusinessException("邮箱验证码错误或已过期");
         }
@@ -74,7 +76,14 @@ public class AuthService {
         emailService.sendVerificationCode(email, code);
     }
 
-    public AuthResponse login(LoginRequest request) {
+    private void requireTurnstile(String token, String remoteIp) {
+        if (!turnstileService.verify(token, remoteIp)) {
+            throw new BusinessException("人机验证失败,请刷新页面重试");
+        }
+    }
+
+    public AuthResponse login(LoginRequest request, String remoteIp) {
+        requireTurnstile(request.getTurnstileToken(), remoteIp);
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
 
