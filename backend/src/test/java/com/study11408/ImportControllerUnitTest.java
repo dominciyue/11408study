@@ -10,6 +10,7 @@ import com.study11408.exception.BusinessException;
 import com.study11408.repository.MaterialRepository;
 import com.study11408.security.JwtTokenProvider;
 import com.study11408.service.AiClientService;
+import com.study11408.service.AiRateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +38,8 @@ class ImportControllerUnitTest {
     @Mock private AiClientService aiClientService;
     @Mock private JwtTokenProvider jwtTokenProvider;
     @Mock private HttpServletRequest request;
+    // 八轮审计后 ImportController 注入了 AiRateLimiter（每用户每分钟限 30 次 LLM 调用）
+    @Mock private AiRateLimiter aiRateLimiter;
 
     @InjectMocks private ImportController controller;
 
