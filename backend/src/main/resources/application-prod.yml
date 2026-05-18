@@ -11,3 +11,17 @@ logging:
   level:
     root: WARN
     com.study11408: INFO
+
+# 生产：只暴露 health/info/prometheus；prometheus 由内网 scrape，无需鉴权
+# health 不带 details；info 不带 env（防止泄漏 DB/JWT secret）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+  info:
+    env:
+      enabled: false

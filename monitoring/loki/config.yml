@@ -1,0 +1,45 @@
+# Loki — 单实例本地存储配置（filesystem，无对象存储依赖）
+# 适合 ≤ 10K 用户场景；上量后可改 S3/MinIO
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  log_level: warn
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+# 限制：15 天保留，每条日志最多 256KB
+limits_config:
+  retention_period: 360h  # 15d
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+  max_line_size: 256kb
+  allow_structured_metadata: true
+
+compactor:
+  working_directory: /loki/compactor
+  delete_request_store: filesystem
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150

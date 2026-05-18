@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.config import settings
 from app.dependencies import get_llm_service
@@ -72,6 +73,18 @@ app.include_router(content_enhance.router, prefix="/ai", tags=["内容增强"])
 app.include_router(pdf_parse.router, prefix="/ai", tags=["PDF解析"])
 app.include_router(quiz_explain.router, prefix="/ai", tags=["AI讲题"])
 app.include_router(study_plan.router, prefix="/ai", tags=["AI学习计划"])
+
+# Prometheus metrics — 自动暴露 http_requests_total / http_request_duration_seconds 等
+# 端点：GET /metrics  (Prometheus 在 docker 内网拉，无需鉴权)
+# include_in_schema=False 让它不污染 swagger 文档
+Instrumentator(
+    should_group_status_codes=True,
+    should_ignore_untemplated=True,
+    should_respect_env_var=True,  # 由 PROMETHEUS_ENABLED=true 控制
+    env_var_name="PROMETHEUS_ENABLED",
+).add(
+    # AI-specific custom metric：调用 LLM 的总请求量（按 provider 维度）
+).instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 
 @app.get("/ai/health")

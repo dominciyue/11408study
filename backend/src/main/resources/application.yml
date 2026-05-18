@@ -28,23 +28,21 @@ spring:
     show-sql: true
     # 多处 service 在 DTO 映射时依赖 lazy load（getGraphData/getStudyPath/
     # Topic/Note 等），关闭 open-in-view 会触发 5+ 个 500。显式声明 true 消除
-    # JpaBaseConfiguration 的默认警告；未来引入 DTO projection 后可改 false。
+    # warning，并提醒后续 P1-11 改 FETCH JOIN 后再关闭。
     open-in-view: true
-    # 显式 dialect 已移除（驱动 auto-detect），消除 HHH90000025 警告。
     properties:
       hibernate:
         format_sql: true
 
   flyway:
     enabled: true
-    locations: classpath:db/migration
     baseline-on-migrate: true
 
   data:
     redis:
       host: localhost
       port: 6379
-      timeout: 5000ms
+      timeout: 5000
 
   cache:
     type: redis
@@ -79,3 +77,22 @@ logging:
   level:
     root: INFO
     com.study11408: DEBUG
+
+# ─── Observability ──────────────────────────────────────────────────────────
+# dev/默认：health/info/prometheus/metrics 全开，方便本地排查；prod 走更严的覆盖
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      application: 11408study-backend

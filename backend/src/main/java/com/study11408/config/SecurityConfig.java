@@ -41,7 +41,12 @@ public class SecurityConfig {
                 .requestMatchers("/auth/login", "/auth/register", "/auth/refresh").permitAll()
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html").permitAll()
                 .requestMatchers("/v3/api-docs/**").permitAll()
-                .requestMatchers("/actuator/**").permitAll()
+                // P0-11 收紧：health/info/prometheus 公开（health 由前端拉、
+                // prometheus 由 docker 内网 scrape）；其他 actuator 端点未在
+                // management.endpoints.web.exposure.include 列表里，根本不会注册，
+                // 所以无需再 hasRole('ADMIN') 兜底——但保留 deny 双保险防错配。
+                .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus").permitAll()
+                .requestMatchers("/actuator/**").denyAll()
                 // 预置学习路径目录：游客也能浏览（登陆前首页/推荐区会拉，详情页直接深链可访问）
                 .requestMatchers("/study-paths/**").permitAll()
                 .anyRequest().authenticated()

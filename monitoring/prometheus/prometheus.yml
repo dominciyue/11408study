@@ -1,0 +1,44 @@
+# Prometheus scrape config for 11408study
+# 默认 scrape interval 30s，evaluation 30s（与 audit roadmap P1-01 一致）
+# Storage retention 15d（由命令行 --storage.tsdb.retention.time=15d 控制）
+
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    cluster: "11408study"
+
+scrape_configs:
+  # ─── Spring Boot backend ───────────────────────────────────────────────
+  # 端点：context-path=/api → /api/actuator/prometheus
+  - job_name: "backend"
+    metrics_path: /api/actuator/prometheus
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["backend:8080"]
+        labels:
+          service: "backend"
+          component: "spring-boot"
+
+  # ─── FastAPI ai-service ────────────────────────────────────────────────
+  # Instrumentator 暴露在 /metrics
+  - job_name: "ai-service"
+    metrics_path: /metrics
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["ai-service:8000"]
+        labels:
+          service: "ai-service"
+          component: "fastapi"
+
+  # ─── Prometheus 自监控 ──────────────────────────────────────────────────
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+        labels:
+          service: "prometheus"
+
+  # ─── PostgreSQL exporter（可选，需启 postgres-exporter sidecar）──────────
+  # - job_name: "postgres"
+  #   static_configs:
+  #     - targets: ["postgres-exporter:9187"]
