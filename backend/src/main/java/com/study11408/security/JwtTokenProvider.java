@@ -29,7 +29,7 @@ public class JwtTokenProvider {
         byte[] decoded;
         try {
             decoded = Decoders.BASE64.decode(secret);
-        } catch (IllegalArgumentException e) {
+        } catch (io.jsonwebtoken.io.DecodingException | IllegalArgumentException e) {
             throw new IllegalStateException("app.jwt.secret 不是合法的 Base64 字符串", e);
         }
         if (decoded.length < 32) {
