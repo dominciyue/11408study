@@ -25,3 +25,18 @@ management:
   info:
     env:
       enabled: false
+
+# ─── 生产关键配置 ──────────────────────────────────────────────────────────
+# 全部不给默认值;env 注入缺失 → Spring 启动期 IllegalArgumentException, fail-fast。
+# 别在 yml 里写 "CHANGE_ME" 类占位 — 会被某些工具误判为有效值导致裸奔。
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}
+  turnstile:
+    enabled: true
+    secret-key: ${TURNSTILE_SECRET_KEY}
+  mail:
+    from: ${MAIL_FROM}
+    from-name: ${MAIL_FROM_NAME:11408 学习平台}
