@@ -14,6 +14,10 @@ import type {
   StudyProgress,
   QuizQuestion,
   WrongAnswer,
+  WrongAnswerGroup,
+  WrongAnswerItem,
+  SimilarQuestionsResponse,
+  WeaknessRadarResponse,
   Note,
   StudySession,
   StudyFeedback,
@@ -254,6 +258,30 @@ export const statsApi = {
   weakness: () =>
     api.get<unknown, ApiResponse<{ topWrongNodes: Array<{ nodeId: number; wrongCount: number; nodeTitle?: string; topicName?: string }>; lowMasteryNodes: Array<{ nodeId: number; masteryLevel: number; nodeTitle?: string }> }>>(
       "/stats/weakness"
+    ),
+  /** V14 — 4 学科雷达 + Top10 弱主题，用于 dashboard 弱点画像卡。 */
+  getWeaknessRadar: () =>
+    api.get<unknown, ApiResponse<WeaknessRadarResponse>>("/stats/weakness-radar"),
+};
+
+// ─── 错题闭环 (V14) ─────────────────────────────────────────────────────────
+// 注意：与已有的 quizApi.getWrongAnswers / quizApi.resolveWrongAnswer 并存。
+// 新 endpoint /wrong-answers/* 返回按 node 聚合的 group 结构，支持相似题与
+// "已掌握" 闭环；旧 /quiz/wrong-answers 返回平铺列表，保留以兼容历史调用。
+export const wrongAnswersApi = {
+  /** 按 node 聚合的错题本 */
+  list: () =>
+    api.get<unknown, ApiResponse<WrongAnswerGroup[]>>("/wrong-answers"),
+  /** 相似题（同 node → topic → subject → AI 兜底）。LLM 兜底可能 5-30s。 */
+  similar: (wrongAnswerId: number, limit: number = 5) =>
+    api.get<unknown, ApiResponse<SimilarQuestionsResponse>>(
+      `/wrong-answers/${wrongAnswerId}/similar`,
+      { params: { limit }, timeout: 60000 }
+    ),
+  /** 标记某条错题已掌握（幂等）。后端会从复习队列移除。 */
+  resolve: (wrongAnswerId: number) =>
+    api.post<unknown, ApiResponse<WrongAnswerItem>>(
+      `/wrong-answers/${wrongAnswerId}/resolve`
     ),
 };
 

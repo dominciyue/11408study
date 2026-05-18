@@ -21,6 +21,8 @@ import type { StatsOverview, WeeklyReport } from "@/types";
 import { BadgesCard } from "@/components/dashboard/badges-card";
 import { DailyTasksCard } from "@/components/dashboard/daily-tasks-card";
 import { WeeklyReportCard } from "@/components/dashboard/weekly-report-card";
+import { WeaknessRadarCard } from "@/components/dashboard/WeaknessRadarCard";
+import { TodayTargetedCard } from "@/components/dashboard/TodayTargetedCard";
 import {
   ResponsiveContainer,
   BarChart,
@@ -114,6 +116,12 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* 弱点画像 + 今日靶向 (V14 — 错题闭环) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <WeaknessRadarCard />
+        <TodayTargetedCard />
       </div>
 
       {/* Daily tasks + Badges (Feature 2 — 游戏化) */}

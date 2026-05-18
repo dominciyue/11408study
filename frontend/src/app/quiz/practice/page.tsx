@@ -57,9 +57,19 @@ function QuizPracticeInner() {
     rawNodeId && Number.isFinite(Number(rawNodeId)) && Number(rawNodeId) > 0
       ? Number(rawNodeId)
       : undefined;
-  // 优先级：nodeId > subjectId（自适应/学科）。nodeId 模式直接拉本节点的题，
-  // 不走自适应（自适应是跨节点推题，与"在该节点学习"语义冲突）。
-  const useAdaptive = !nodeId && (adaptiveFlag || subjectId == null);
+  // V14 — 来自 dashboard "今日靶向" 的 prefill：?ids=1,2,3
+  // 题对象由 TodayTargetedCard 暂存在 sessionStorage（key = `quiz:prefetch:${ids}`）
+  const rawIds = searchParams.get("ids");
+  const idsList = useMemo(() => {
+    if (!rawIds) return [] as number[];
+    return rawIds
+      .split(",")
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n) && n > 0);
+  }, [rawIds]);
+  // 优先级：ids > nodeId > subjectId/adaptive。
+  // nodeId 模式直接拉本节点的题，不走自适应（与"在该节点学习"语义冲突）。
+  const useAdaptive = !idsList.length && !nodeId && (adaptiveFlag || subjectId == null);
 
   type SubmitResult = { correct: boolean; correctAnswer: string; explanation?: string };
 
@@ -95,8 +105,38 @@ function QuizPracticeInner() {
       setSelected(null);
       try {
         let questionsData: QuizQuestion[] = [];
-        // 单节点模式：只拉该节点的题（来自 V2/V8/V9/V10 真题种子或既往 AI 生题）
-        if (nodeId) {
+        if (idsList.length > 0) {
+          // V14 — prefill 模式：从 sessionStorage 取 dashboard 暂存的题对象
+          const key = `quiz:prefetch:${idsList.join(",")}`;
+          if (typeof window !== "undefined") {
+            try {
+              const raw = window.sessionStorage.getItem(key);
+              if (raw) {
+                const parsed = JSON.parse(raw) as QuizQuestion[];
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  // 按 idsList 顺序对齐，过滤掉缺失项
+                  const byId = new Map(parsed.map((q) => [q.id, q]));
+                  questionsData = idsList
+                    .map((id) => byId.get(id))
+                    .filter((q): q is QuizQuestion => !!q);
+                }
+                window.sessionStorage.removeItem(key);
+              }
+            } catch {
+              // JSON 解析或 sessionStorage 异常，走降级
+            }
+          }
+          // 降级：sessionStorage miss 时，复用 adaptive 重新拉一批（同一用户算法稳定）
+          if (questionsData.length === 0) {
+            try {
+              const adaptiveRes = await quizApi.adaptiveGenerate(undefined, idsList.length);
+              questionsData = adaptiveRes.data || [];
+            } catch (_err) {
+              // 静默降级
+            }
+          }
+        } else if (nodeId) {
+          // 单节点模式：只拉该节点的题（来自 V2/V8/V9/V10 真题种子或既往 AI 生题）
           try {
             const quizRes = await quizApi.generate([nodeId], 10);
             questionsData = quizRes.data || [];
@@ -136,7 +176,7 @@ function QuizPracticeInner() {
     return () => {
       cancelled = true;
     };
-  }, [subjectId, useAdaptive, nodeId]);
+  }, [subjectId, useAdaptive, nodeId, idsList]);
 
   // 提交（手动 / 自动），auto=true 时未选当作错（提交一个占位串）
   const submit = useCallback(
@@ -206,13 +246,14 @@ function QuizPracticeInner() {
   }, [timedFlag, q, result, submit, idx]);
 
   const headerBadge = useMemo(() => {
+    if (idsList.length > 0) return { text: "今日靶向", cls: "bg-blue-500/20 text-blue-300" };
     if (nodeId) return { text: "单节点练习", cls: "bg-emerald-500/20 text-emerald-300" };
     if (adaptiveFlag) return { text: "自适应", cls: "bg-purple-500/20 text-purple-300" };
     if (timedFlag) return { text: "限时模拟", cls: "bg-red-500/20 text-red-300" };
     if (subjectId != null && SUBJECT_NAMES[subjectId])
       return { text: SUBJECT_NAMES[subjectId], cls: "bg-blue-500/20 text-blue-300" };
     return { text: "自适应", cls: "bg-purple-500/20 text-purple-300" };
-  }, [adaptiveFlag, timedFlag, subjectId, nodeId]);
+  }, [adaptiveFlag, timedFlag, subjectId, nodeId, idsList]);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">

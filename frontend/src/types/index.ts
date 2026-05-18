@@ -193,6 +193,94 @@ export interface WrongAnswer {
   resolved: boolean;
 }
 
+// ─── 错题闭环 (V14) ────────────────────────────────────────────────────────
+/**
+ * 后端 WrongAnswerDTO 的 TS 镜像（GET /api/wrong-answers/{id}... 等返回的单条形态）。
+ * 字段 1:1 对齐 backend/src/main/java/com/study11408/dto/WrongAnswerDTO.java。
+ *
+ * <p>resolved 在 Java 是 Boolean（可空），但实际所有 service 调用都填值，
+ * 因此前端按 boolean 处理；如未来后端可能省略字段，可改 boolean | undefined。
+ */
+export interface WrongAnswerItem {
+  id: number;
+  questionId: number;
+  nodeId?: number;
+  questionText?: string;
+  userAnswer: string;
+  correctAnswer?: string;
+  explanation?: string;
+  answeredAt: string;
+  resolved: boolean;
+  topicName?: string;
+  nodeTitle?: string;
+}
+
+/**
+ * GET /api/wrong-answers — 按 node 聚合的错题分组。
+ * enqueued = true 表示该 node 已被纳入复习队列。
+ */
+export interface WrongAnswerGroup {
+  nodeId: number;
+  nodeTitle?: string;
+  topicName?: string;
+  subjectName?: string;
+  wrongCount: number;
+  latestAt: string;
+  enqueued: boolean;
+  items: WrongAnswerItem[];
+}
+
+/**
+ * GET /api/wrong-answers/{id}/similar 返回的单条相似题。
+ * id 为 null 表示 LLM 兜底生成（generated=true）。
+ */
+export interface SimilarItem {
+  id: number | null;
+  content: string;
+  options?: string;
+  answer?: string;
+  explanation?: string;
+  questionType: string;
+  generated: boolean;
+}
+
+/**
+ * GET /api/wrong-answers/{id}/similar 的完整响应。
+ * source ∈ DB_NODE | DB_TOPIC | DB_SUBJECT | MIXED | AI_FALLBACK
+ * aiAvailable=false 表示 AI 兜底失败，前端应提示降级。
+ */
+export interface SimilarQuestionsResponse {
+  source: string;
+  items: SimilarItem[];
+  aiAvailable: boolean;
+  totalFromDb: number;
+  totalGenerated: number;
+}
+
+// ─── 弱点画像 (V14) ────────────────────────────────────────────────────────
+export interface SubjectMastery {
+  id: number;
+  name: string;
+  code: string;
+  mastery: number; // 0-100
+  nodes: number;
+  studied: number;
+}
+
+export interface WeakTopic {
+  id: number;
+  name: string;
+  subjectName?: string;
+  mastery: number; // 0-100
+  nodes: number;
+}
+
+/** GET /api/stats/weakness-radar — 4 学科 mastery + Top10 弱主题 */
+export interface WeaknessRadarResponse {
+  subjects: SubjectMastery[];
+  weakTopics: WeakTopic[];
+}
+
 // ─── Note ────────────────────────────────────────────────────────────────────
 export interface Note {
   id: number;
