@@ -1,11 +1,13 @@
 package com.study11408.service;
 
+import com.study11408.exception.BusinessException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -40,7 +42,7 @@ public class EmailService {
             log.info("verification code sent to {}", to);
         } catch (MessagingException | UnsupportedEncodingException e) {
             log.error("failed to send verification code to {}", to, e);
-            throw new IllegalStateException("邮件发送失败,请稍后重试", e);
+            throw new BusinessException("邮件发送失败,请稍后重试", HttpStatus.BAD_GATEWAY);
         }
     }
 }
