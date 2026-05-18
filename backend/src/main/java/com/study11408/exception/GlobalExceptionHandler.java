@@ -94,7 +94,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(
             org.springframework.dao.DataIntegrityViolationException ex) {
-        String raw = ex.getMostSpecificCause().getMessage();
+        // Spring 通常包了 JDBC cause, 但极端情况(test mock / 手动 new)可能没有.
+        Throwable cause = ex.getMostSpecificCause();
+        String raw = cause != null ? cause.getMessage() : ex.getMessage();
         log.warn("数据约束冲突: {}", raw);
         // 不把原始 message 暴露给前端 — 只给用户级提示
         if (raw != null && raw.contains("duplicate key")) {
