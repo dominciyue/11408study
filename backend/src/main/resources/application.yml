@@ -80,6 +80,12 @@ app:
   ai:
     service-url: http://localhost:8000
 
+  turnstile:
+    secret-key: ${TURNSTILE_SECRET_KEY:}
+    # 设为 false 时跳过 Turnstile 校验(本地 dev 默认关掉,生产必须打开)
+    enabled: ${TURNSTILE_ENABLED:false}
+    verify-url: https://challenges.cloudflare.com/turnstile/v0/siteverify
+
 springdoc:
   api-docs:
     path: /v3/api-docs
