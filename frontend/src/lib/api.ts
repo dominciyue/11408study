@@ -259,6 +259,22 @@ export const statsApi = {
   /** V14 — 4 学科雷达 + Top10 弱主题，用于 dashboard 弱点画像卡。 */
   getWeaknessRadar: () =>
     api.get<unknown, ApiResponse<WeaknessRadarResponse>>("/stats/weakness-radar"),
+
+  /** 每学科 inline/external 题数，quiz 主页 banner 用。 */
+  subjectQuestionCounts: () =>
+    api.get<
+      unknown,
+      ApiResponse<
+        Array<{
+          subjectId: number;
+          name: string;
+          code: string;
+          totalNodes: number;
+          inlineQs: number;
+          externalQs: number;
+        }>
+      >
+    >("/stats/subject-question-counts"),
 };
 
 // ─── 错题闭环 (V14) ─────────────────────────────────────────────────────────

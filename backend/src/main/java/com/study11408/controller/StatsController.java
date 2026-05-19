@@ -63,6 +63,12 @@ public class StatsController {
         return ApiResponse.ok(weeklyReportService.build(userId));
     }
 
+    @Operation(summary = "每学科可练题数 — 区分 inline / external，用于 quiz 主页 banner")
+    @GetMapping("/subject-question-counts")
+    public ApiResponse<List<Map<String, Object>>> getSubjectQuestionCounts() {
+        return ApiResponse.ok(statsService.getSubjectQuestionCounts());
+    }
+
     private Long getUserId(HttpServletRequest request) {
         String token = jwtTokenProvider.resolveToken(request);
         return jwtTokenProvider.getUserId(token);

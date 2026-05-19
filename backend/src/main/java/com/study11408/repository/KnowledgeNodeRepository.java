@@ -41,4 +41,19 @@ public interface KnowledgeNodeRepository extends JpaRepository<KnowledgeNode, Lo
                                               @Param("subjectId") Long subjectId,
                                               @Param("keyword") String keyword,
                                               Pageable pageable);
+
+    /**
+     * 一条 native SQL 取每学科的 (inline_qs, external_qs) 计数，供 quiz 主页 banner。
+     * 返回每行：[subject_id, inline_qs_count, external_qs_count]
+     */
+    @Query(value =
+        "SELECT t.subject_id, " +
+        "       SUM(CASE WHEN q.external_url IS NULL OR q.external_url = '' THEN 1 ELSE 0 END) AS inline_qs, " +
+        "       SUM(CASE WHEN q.external_url IS NOT NULL AND q.external_url <> '' THEN 1 ELSE 0 END) AS external_qs " +
+        "FROM topics t " +
+        "LEFT JOIN knowledge_nodes n ON n.topic_id = t.id " +
+        "LEFT JOIN quiz_questions q ON q.node_id = n.id " +
+        "GROUP BY t.subject_id",
+        nativeQuery = true)
+    List<Object[]> findInlineExternalQuestionCountBySubject();
 }

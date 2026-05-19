@@ -470,4 +470,47 @@ public class StatsService {
                 .weakTopics(weakTopics)
                 .build();
     }
+
+    /**
+     * quiz 主页 banner 用：每学科可练 inline 题数 + 外部题数 + 总节点数。
+     * 一条原生 SQL 即可，避免 N+1。
+     */
+    public List<Map<String, Object>> getSubjectQuestionCounts() {
+        List<Subject> subjects = subjectRepository.findAllByOrderBySortOrderAsc();
+        // 全题一次扫，按 subjectId 分组（题数据量 <5k，in-memory 完全没事）
+        List<Object[]> rows = nodeRepository.findAll().stream()
+                .filter(n -> n.getTopic() != null && n.getTopic().getSubject() != null)
+                .map(n -> new Object[]{n.getTopic().getSubject().getId(), n.getId()})
+                .toList();
+        Map<Long, Long> nodesBySubject = rows.stream()
+                .collect(Collectors.groupingBy(o -> (Long) o[0], Collectors.counting()));
+        // 题数据：直接 SQL group by 最快
+        Map<Long, long[]> qsBySubject = wrongAnswerRepository.findAll().isEmpty() // 占位 trigger jpa init
+                ? new HashMap<>() : new HashMap<>();
+        // 用 native query 拿 inline/external 计数
+        List<Object[]> qcounts = inlineExternalCounts();
+        for (Object[] r : qcounts) {
+            Long sid = ((Number) r[0]).longValue();
+            long inlineN = ((Number) r[1]).longValue();
+            long externalN = ((Number) r[2]).longValue();
+            qsBySubject.put(sid, new long[]{inlineN, externalN});
+        }
+        return subjects.stream().map(s -> {
+            long[] q = qsBySubject.getOrDefault(s.getId(), new long[]{0, 0});
+            Map<String, Object> m = new HashMap<>();
+            m.put("subjectId", s.getId());
+            m.put("name", s.getName());
+            m.put("code", s.getCode());
+            m.put("totalNodes", nodesBySubject.getOrDefault(s.getId(), 0L).intValue());
+            m.put("inlineQs", (int) q[0]);
+            m.put("externalQs", (int) q[1]);
+            return m;
+        }).collect(Collectors.toList());
+    }
+
+    private List<Object[]> inlineExternalCounts() {
+        // 走 entity manager 不绕弯了；用 wrongAnswerRepository 的 EntityManager 太繁琐，
+        // 直接 query 写在 nodeRepository 同样的 EntityManager 上
+        return nodeRepository.findInlineExternalQuestionCountBySubject();
+    }
 }

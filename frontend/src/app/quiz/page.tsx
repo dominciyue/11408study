@@ -73,12 +73,22 @@ function truncate(s: string | undefined, n: number): string {
   return s.length > n ? s.slice(0, n) + "…" : s;
 }
 
+type SubjectCounts = {
+  subjectId: number;
+  name: string;
+  code: string;
+  totalNodes: number;
+  inlineQs: number;
+  externalQs: number;
+};
+
 export default function QuizPage() {
   const router = useRouter();
   const [wrongAnswers, setWrongAnswers] = useState<WrongAnswer[] | null>(null);
   const [overview, setOverview] = useState<StatsOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [askingFor, setAskingFor] = useState<WrongAnswer | null>(null);
+  const [subjectCounts, setSubjectCounts] = useState<SubjectCounts[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,6 +97,7 @@ export default function QuizPage() {
       const tasks = await Promise.allSettled([
         quizApi.getWrongAnswers(),
         statsApi.overview(),
+        statsApi.subjectQuestionCounts(),
       ]);
       if (cancelled) return;
       if (tasks[0].status === "fulfilled") {
@@ -98,6 +109,9 @@ export default function QuizPage() {
       if (tasks[1].status === "fulfilled") {
         setOverview(tasks[1].value.data);
       }
+      if (tasks[2].status === "fulfilled") {
+        setSubjectCounts(tasks[2].value.data || []);
+      }
       setLoading(false);
     }
     run();
@@ -105,6 +119,10 @@ export default function QuizPage() {
       cancelled = true;
     };
   }, []);
+
+  function countFor(subjectId: number): SubjectCounts | undefined {
+    return subjectCounts.find((s) => s.subjectId === subjectId);
+  }
 
   const unresolvedWrong = useMemo(() => {
     if (!wrongAnswers) return [] as WrongAnswer[];
@@ -166,19 +184,37 @@ export default function QuizPage() {
                       className="flex flex-wrap gap-2 mt-3"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {SUBJECTS.map((s) => (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            router.push(`/quiz/practice?subjectId=${s.id}`);
-                          }}
-                          className={`px-3 py-1 rounded-full text-xs border transition-colors hover:opacity-90 ${s.color}`}
-                        >
-                          {s.name}
-                        </button>
-                      ))}
+                      {SUBJECTS.map((s) => {
+                        const c = countFor(s.id);
+                        const inlineN = c?.inlineQs ?? 0;
+                        const disabled = inlineN === 0;
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            disabled={disabled}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!disabled) router.push(`/quiz/practice?subjectId=${s.id}`);
+                            }}
+                            title={
+                              disabled
+                                ? `${s.name} 暂无可练题（AI 题库扩充中或仅有外部链接题）`
+                                : `${s.name} 共 ${inlineN} 道可练题`
+                            }
+                            className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+                              disabled
+                                ? "opacity-40 cursor-not-allowed bg-gray-500/10 text-gray-500 border-gray-500/20"
+                                : "hover:opacity-90 " + s.color
+                            }`}
+                          >
+                            {s.name}
+                            {c ? (
+                              <span className="ml-1 opacity-70">({inlineN})</span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
