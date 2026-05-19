@@ -49,6 +49,8 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/**").denyAll()
                 // 预置学习路径目录：游客也能浏览（登陆前首页/推荐区会拉，详情页直接深链可访问）
                 .requestMatchers("/study-paths/**").permitAll()
+                // 题库每学科可练题数：纯聚合数据，不涉及用户个人信息，公开方便 quiz 主页 banner
+                .requestMatchers("/stats/subject-question-counts").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
