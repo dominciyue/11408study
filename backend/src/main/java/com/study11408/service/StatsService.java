@@ -111,17 +111,45 @@ public class StatsService {
                 .map(p -> p.getLastReview().toLocalDate())
                 .collect(Collectors.toSet());
 
-        int streakDays = 0;
-        for (int i = 0; i < 365; i++) {
-            LocalDate day = today.minusDays(i);
-            List<StudySession> daySessions = sessionsByDay.getOrDefault(day, Collections.emptyList());
-            boolean studied = reviewDays.contains(day) || daySessions.stream().anyMatch(s -> {
+        // 抽取"当日是否学过"判断:既给 currentStreak 用,也给 longestStreak / recentActivity 复用,
+        // 保持口径完全一致(任何 lastReview / 有效 session = 算学过)。
+        java.util.function.Predicate<LocalDate> studiedOn = (day) -> {
+            if (reviewDays.contains(day)) return true;
+            return sessionsByDay.getOrDefault(day, Collections.emptyList()).stream().anyMatch(s -> {
                 if (s.getEndTime() == null) return false;
                 long minutes = java.time.Duration.between(s.getStartTime(), s.getEndTime()).toMinutes();
-                return minutes > 0 || (s.getStudiedNodes() != null && s.getStudiedNodes() > 0) || (s.getReviewedNodes() != null && s.getReviewedNodes() > 0);
+                return minutes > 0
+                        || (s.getStudiedNodes() != null && s.getStudiedNodes() > 0)
+                        || (s.getReviewedNodes() != null && s.getReviewedNodes() > 0);
             });
-            if (!studied) break;
+        };
+
+        int streakDays = 0;
+        for (int i = 0; i < 365; i++) {
+            if (!studiedOn.test(today.minusDays(i))) break;
             streakDays++;
+        }
+
+        // 历史最长连续 — 在近 365 天范围内找最大连续段。
+        // 注意:窗口截断意味着 365 天前的更长 streak 不会被记。对 1 年内的考研用户够用,
+        // 想要全历史最长应改成持久化字段(留作未来 schema 演进)。
+        int longestStreakDays = streakDays;
+        int runningStreak = 0;
+        for (int i = 364; i >= 0; i--) {
+            if (studiedOn.test(today.minusDays(i))) {
+                runningStreak++;
+                if (runningStreak > longestStreakDays) {
+                    longestStreakDays = runningStreak;
+                }
+            } else {
+                runningStreak = 0;
+            }
+        }
+
+        // 最近 14 天活动 (oldest -> newest),前端 mini 火焰条
+        List<Boolean> recentActivityDays = new ArrayList<>(14);
+        for (int i = 13; i >= 0; i--) {
+            recentActivityDays.add(studiedOn.test(today.minusDays(i)));
         }
 
         List<Long> weeklyStudyTimeMinutes = new ArrayList<>();
@@ -177,6 +205,8 @@ public class StatsService {
                 .reviewedToday(reviewedToday)
                 .studyTimeTodayMinutes(studyTimeTodayMinutes)
                 .streakDays(streakDays)
+                .longestStreakDays(longestStreakDays)
+                .recentActivityDays(recentActivityDays)
                 .weeklyStudyTimeMinutes(weeklyStudyTimeMinutes)
                 .subjectProgress(subjectProgress)
                 .badges(badges)

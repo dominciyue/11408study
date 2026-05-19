@@ -93,10 +93,36 @@ export default function DashboardPage() {
           <p className="text-muted-foreground mt-1">今天也要加油学习哦！坚持就是胜利</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-500/10 border border-orange-500/20">
-            <Flame className="w-5 h-5 text-orange-400" />
-            <span className="text-orange-400 font-bold text-lg">{overview?.streakDays ?? 0}</span>
-            <span className="text-orange-400/70 text-sm">天连续</span>
+          <div className="flex flex-col gap-1.5 px-4 py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 min-w-[200px]">
+            <div className="flex items-center gap-2">
+              <Flame className="w-5 h-5 text-orange-400" />
+              <span className="text-orange-400 font-bold text-lg">{overview?.streakDays ?? 0}</span>
+              <span className="text-orange-400/70 text-sm">天连续</span>
+              {typeof overview?.longestStreakDays === "number"
+                && overview.longestStreakDays > (overview.streakDays ?? 0) ? (
+                <span
+                  className="ml-auto text-[10px] text-orange-300/60"
+                  title="近 365 天内的最长连续学习天数"
+                >
+                  最长 {overview.longestStreakDays}
+                </span>
+              ) : null}
+            </div>
+            {/* 近 14 天 mini 火焰条 — oldest → newest */}
+            {overview?.recentActivityDays && overview.recentActivityDays.length > 0 ? (
+              <div className="flex items-center gap-0.5" title="最近 14 天学习活动 (← 旧 / 新 →)">
+                {overview.recentActivityDays.map((active, i) => (
+                  <span
+                    key={i}
+                    className={
+                      active
+                        ? "w-2 h-3 rounded-sm bg-orange-400/80"
+                        : "w-2 h-3 rounded-sm bg-orange-400/15"
+                    }
+                  />
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

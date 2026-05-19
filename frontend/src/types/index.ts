@@ -374,6 +374,8 @@ export interface StatsOverview {
   reviewedToday: number;
   studyTimeTodayMinutes: number;
   streakDays: number;
+  longestStreakDays?: number;
+  recentActivityDays?: boolean[];
   weeklyStudyTimeMinutes: number[];
   subjectProgress: {
     subjectId: number;

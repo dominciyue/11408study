@@ -22,6 +22,10 @@ public class StatsOverviewDTO {
     private Long reviewedToday;
     private Long studyTimeTodayMinutes;
     private Integer streakDays;
+    /** 近 365 天内的最长连续学习天数(含 currentStreak)。用于"突破历史最长"成就感反馈。 */
+    private Integer longestStreakDays;
+    /** 最近 14 天的逐日活动(oldest -> newest);每位 true=当日有学习。前端用作 mini 火焰条。 */
+    private List<Boolean> recentActivityDays;
 
     private List<Long> weeklyStudyTimeMinutes; // last 7 days, oldest -> newest
     private List<SubjectProgressDTO> subjectProgress;
