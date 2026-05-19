@@ -204,6 +204,7 @@ function GraphPageInner() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [masteryFilter, setMasteryFilter] = useState<MasteryFilter>(null);
+  const [heatmapOn, setHeatmapOn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -279,6 +280,16 @@ function GraphPageInner() {
     // 一次性副作用：仅在 focusNodeId 或节点数变化时触发
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusNodeId, nodes.length]);
+
+  // 热度地图开关 — 通过 data.heatmap 让自定义节点切换配色（独立于布局）
+  useEffect(() => {
+    setNodes((nds) =>
+      nds.map((n) => ({
+        ...n,
+        data: { ...n.data, heatmap: heatmapOn },
+      })),
+    );
+  }, [heatmapOn, setNodes, rawNodes]);
 
   // masteryFilter + topicId + searchQuery 联合作用：不匹配的 dimmed
   useEffect(() => {
@@ -399,6 +410,8 @@ function GraphPageInner() {
           onSearchChange={setSearchQuery}
           masteryFilter={masteryFilter}
           onMasteryFilter={setMasteryFilter}
+          heatmapOn={heatmapOn}
+          onHeatmapToggle={setHeatmapOn}
           onZoomIn={handleZoomIn}
           onZoomOut={handleZoomOut}
           onFitView={handleFitView}
@@ -406,6 +419,29 @@ function GraphPageInner() {
           nodeCount={nodes.length}
           edgeCount={edges.length}
         />
+
+        {/* 热度地图色例 — 仅在热度地图开启时显示 */}
+        {heatmapOn && nodes.length > 0 ? (
+          <div className="absolute bottom-4 left-4 z-10 pointer-events-none rounded-lg border border-white/[0.08] bg-[#111118]/90 backdrop-blur-md px-3 py-2 text-[11px] text-gray-400">
+            <div className="font-medium text-gray-300 mb-1.5">掌握度色例</div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="w-2.5 h-2.5 rounded-sm border border-gray-600/60 bg-gray-700/40" />
+              <span>未学</span>
+            </div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="w-2.5 h-2.5 rounded-sm border border-red-500/60 bg-red-500/20" />
+              <span>薄弱 &lt;30</span>
+            </div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="w-2.5 h-2.5 rounded-sm border border-amber-500/60 bg-amber-500/20" />
+              <span>一般 30-69</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-sm border border-emerald-500/60 bg-emerald-500/20" />
+              <span>掌握 ≥70</span>
+            </div>
+          </div>
+        ) : null}
 
         {isLoading ? (
           <div className="absolute inset-0 flex items-center justify-center bg-[#0f0f17] text-gray-500">

@@ -7,6 +7,7 @@ import {
   ZoomOut,
   Maximize2,
   RotateCcw,
+  Flame,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +23,8 @@ interface GraphToolbarProps {
   onSearchChange: (query: string) => void;
   masteryFilter?: MasteryFilter;
   onMasteryFilter?: (filter: MasteryFilter) => void;
+  heatmapOn?: boolean;
+  onHeatmapToggle?: (next: boolean) => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onFitView: () => void;
@@ -45,6 +48,8 @@ export function GraphToolbar({
   onSearchChange,
   masteryFilter = null,
   onMasteryFilter,
+  heatmapOn = false,
+  onHeatmapToggle,
   onZoomIn,
   onZoomOut,
   onFitView,
@@ -68,6 +73,26 @@ export function GraphToolbar({
 
         {/* Subject 子主题筛选：原硬编码 ds/co/os/cn 仅 408 适用，现已移除；
             学科切换由 /subjects 入口或 URL ?subjectId= 控制。 */}
+
+        {/* Heatmap toggle — 热度地图：按掌握度给节点上色（红=薄弱/黄=一般/绿=已掌握） */}
+        {onHeatmapToggle ? (
+          <div className="pointer-events-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onHeatmapToggle(!heatmapOn)}
+              className={
+                heatmapOn
+                  ? "bg-orange-500/15 border-orange-500/40 text-orange-300 hover:bg-orange-500/25"
+                  : "bg-[#111118]/90 border-white/[0.08] text-gray-300 hover:bg-white/10"
+              }
+              title="按掌握度给节点上色"
+            >
+              <Flame className="w-3.5 h-3.5 mr-1.5" />
+              热度地图
+            </Button>
+          </div>
+        ) : null}
 
         {/* Mastery filter */}
         {onMasteryFilter ? (

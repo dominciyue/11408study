@@ -14,6 +14,19 @@ function masteryToStarsLevel(m: number): number {
   return 5;
 }
 
+/**
+ * 热度地图配色:按 mastery 把节点底色覆写为红/橙/绿/灰,一眼看出薄弱区。
+ * undefined / 0 = 未学(灰), 1-29 = 薄弱(红), 30-69 = 一般(琥珀), 70+ = 掌握(绿)。
+ */
+function masteryHeatColors(m: number | undefined): { border: string; bg: string; text: string } {
+  if (m == null || !Number.isFinite(m) || m <= 0) {
+    return { border: "border-gray-600/40", bg: "bg-gray-700/20", text: "text-gray-300" };
+  }
+  if (m < 30) return { border: "border-red-500/50", bg: "bg-red-500/10", text: "text-red-300" };
+  if (m < 70) return { border: "border-amber-500/50", bg: "bg-amber-500/10", text: "text-amber-300" };
+  return { border: "border-emerald-500/50", bg: "bg-emerald-500/10", text: "text-emerald-300" };
+}
+
 const difficultyColors: Record<string, string> = {
   EASY: "bg-green-500",
   MEDIUM: "bg-yellow-500",
@@ -39,12 +52,14 @@ export interface KnowledgeNodeData {
   mastery?: number;
   selected?: boolean;
   dimmed?: boolean;
+  heatmap?: boolean;
   [key: string]: unknown;
 }
 
 function KnowledgeNodeComponent({ data }: NodeProps) {
   const nodeData = data as KnowledgeNodeData;
-  const colors = subjectColors[nodeData.topicName || ""] || subjectColors["default"];
+  const subjectPalette = subjectColors[nodeData.topicName || ""] || subjectColors["default"];
+  const colors = nodeData.heatmap ? masteryHeatColors(nodeData.mastery) : subjectPalette;
   const diffColor = difficultyColors[nodeData.difficulty || "MEDIUM"] || difficultyColors.MEDIUM;
 
   return (
