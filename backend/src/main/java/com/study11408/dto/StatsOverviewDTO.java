@@ -28,6 +28,9 @@ public class StatsOverviewDTO {
     private List<Boolean> recentActivityDays;
 
     private List<Long> weeklyStudyTimeMinutes; // last 7 days, oldest -> newest
+    /** 最近 365 天逐日学习分钟数(oldest -> newest),给前端 GitHub 风格热力图用。
+     *  ~365 longs ≈ 2KB,小到不必拆独立端点。 */
+    private List<Long> dailyStudyMinutes;
     private List<SubjectProgressDTO> subjectProgress;
 
     // Feature 2 — 游戏化卡片（基于既有数据派生，无新表）

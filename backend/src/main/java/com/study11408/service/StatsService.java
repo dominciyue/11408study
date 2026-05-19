@@ -162,6 +162,17 @@ public class StatsService {
             weeklyStudyTimeMinutes.add(minutes);
         }
 
+        // GitHub 风格热力图 — 近 365 天逐日分钟数 (oldest -> newest)
+        List<Long> dailyStudyMinutes = new ArrayList<>(365);
+        for (int i = 364; i >= 0; i--) {
+            LocalDate day = today.minusDays(i);
+            long minutes = sessionsByDay.getOrDefault(day, Collections.emptyList()).stream()
+                    .filter(s -> s.getEndTime() != null)
+                    .mapToLong(s -> java.time.Duration.between(s.getStartTime(), s.getEndTime()).toMinutes())
+                    .sum();
+            dailyStudyMinutes.add(minutes);
+        }
+
         List<Subject> subjects = subjectRepository.findAllByOrderBySortOrderAsc();
         Map<Long, List<StudyProgress>> progressBySubjectId = progressList.stream()
                 .filter(p -> p.getNode() != null && p.getNode().getTopic() != null && p.getNode().getTopic().getSubject() != null)
@@ -208,6 +219,7 @@ public class StatsService {
                 .longestStreakDays(longestStreakDays)
                 .recentActivityDays(recentActivityDays)
                 .weeklyStudyTimeMinutes(weeklyStudyTimeMinutes)
+                .dailyStudyMinutes(dailyStudyMinutes)
                 .subjectProgress(subjectProgress)
                 .badges(badges)
                 .dailyTasks(dailyTasks)

@@ -377,6 +377,8 @@ export interface StatsOverview {
   longestStreakDays?: number;
   recentActivityDays?: boolean[];
   weeklyStudyTimeMinutes: number[];
+  /** 最近 365 天逐日学习分钟数 (oldest -> newest),给热力图渲染。 */
+  dailyStudyMinutes?: number[];
   subjectProgress: {
     subjectId: number;
     name: string;

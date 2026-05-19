@@ -23,6 +23,7 @@ import { DailyTasksCard } from "@/components/dashboard/daily-tasks-card";
 import { WeeklyReportCard } from "@/components/dashboard/weekly-report-card";
 import { WeaknessRadarCard } from "@/components/dashboard/WeaknessRadarCard";
 import { TodayTargetedCard } from "@/components/dashboard/TodayTargetedCard";
+import { StudyHeatmapCard } from "@/components/dashboard/study-heatmap-card";
 import {
   ResponsiveContainer,
   BarChart,
@@ -143,6 +144,9 @@ export default function DashboardPage() {
           </Card>
         ))}
       </div>
+
+      {/* 学习热力图 (Feature — GitHub 风格 52 周热度) */}
+      <StudyHeatmapCard minutesByDay={overview?.dailyStudyMinutes} />
 
       {/* 弱点画像 + 今日靶向 (V14 — 错题闭环) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
