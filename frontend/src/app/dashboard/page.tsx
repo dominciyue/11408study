@@ -4,15 +4,15 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
-  ClipboardCheck,
   Upload,
   Flame,
   TrendingUp,
   Clock,
   CheckCircle2,
   RotateCcw,
+  ChevronDown,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useAuthStore } from "@/stores/auth-store";
@@ -24,15 +24,6 @@ import { WeeklyReportCard } from "@/components/dashboard/weekly-report-card";
 import { WeaknessRadarCard } from "@/components/dashboard/WeaknessRadarCard";
 import { TodayTargetedCard } from "@/components/dashboard/TodayTargetedCard";
 import { StudyHeatmapCard } from "@/components/dashboard/study-heatmap-card";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
 
 function minutesToHoursText(minutes: number) {
   if (!Number.isFinite(minutes)) return "0h";
@@ -78,10 +69,7 @@ export default function DashboardPage() {
     ];
   }, [overview]);
 
-  const weeklyChartData = useMemo(() => {
-    const arr = overview?.weeklyStudyTimeMinutes ?? [];
-    return arr.map((m, idx) => ({ day: `D${idx + 1}`, minutes: m }));
-  }, [overview]);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -148,20 +136,11 @@ export default function DashboardPage() {
       {/* 学习热力图 (Feature — GitHub 风格 52 周热度) */}
       <StudyHeatmapCard minutesByDay={overview?.dailyStudyMinutes} />
 
-      {/* 弱点画像 + 今日靶向 (V14 — 错题闭环) */}
+      {/* 今日重点 — 弱点画像 + 今日靶向并列（V14 错题闭环） */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <WeaknessRadarCard />
         <TodayTargetedCard />
       </div>
-
-      {/* Daily tasks + Badges (Feature 2 — 游戏化) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <DailyTasksCard tasks={overview?.dailyTasks} />
-        <BadgesCard badges={overview?.badges} />
-      </div>
-
-      {/* 本周总结 (Feature 9) */}
-      <WeeklyReportCard report={weeklyReport ?? undefined} />
 
       {/* Subject progress cards */}
       <div>
@@ -232,74 +211,31 @@ export default function DashboardPage() {
         )}
       </div>
 
-      {/* Quick actions */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-200 mb-4">快速操作</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Button
-            variant="outline"
-            className="h-auto py-6 flex flex-col items-center gap-3 border-white/[0.08] hover:border-blue-500/30 hover:bg-blue-500/5"
-            onClick={() => router.push("/study")}
-          >
-            <BookOpen className="w-8 h-8 text-blue-400" />
-            <div className="text-center">
-              <p className="font-medium text-gray-200">开始学习</p>
-              <p className="text-xs text-gray-500 mt-1">智能推荐学习内容</p>
+      {/* 成就与活动 — 默认折叠（每日任务 / 徽章 / 本周报告）*/}
+      <Card className="border-white/[0.06] bg-white/[0.02]">
+        <button
+          onClick={() => setMoreOpen(!moreOpen)}
+          className="w-full flex items-center justify-between p-4 hover:bg-white/[0.04] transition-colors"
+        >
+          <span className="text-sm font-medium text-gray-300 flex items-center gap-2">
+            <Flame className="w-4 h-4 text-orange-400" />
+            成就与活动
+            <span className="text-xs text-gray-500 ml-2">每日任务·徽章·本周报告</span>
+          </span>
+          <ChevronDown
+            className={`w-4 h-4 text-gray-500 transition-transform ${moreOpen ? "" : "-rotate-90"}`}
+          />
+        </button>
+        {moreOpen ? (
+          <CardContent className="p-4 pt-0 space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <DailyTasksCard tasks={overview?.dailyTasks} />
+              <BadgesCard badges={overview?.badges} />
             </div>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-6 flex flex-col items-center gap-3 border-white/[0.08] hover:border-green-500/30 hover:bg-green-500/5"
-            onClick={() => router.push("/quiz")}
-          >
-            <ClipboardCheck className="w-8 h-8 text-green-400" />
-            <div className="text-center">
-              <p className="font-medium text-gray-200">快速测验</p>
-              <p className="text-xs text-gray-500 mt-1">检验学习成果</p>
-            </div>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-6 flex flex-col items-center gap-3 border-white/[0.08] hover:border-purple-500/30 hover:bg-purple-500/5"
-            onClick={() => router.push("/materials")}
-          >
-            <Upload className="w-8 h-8 text-purple-400" />
-            <div className="text-center">
-              <p className="font-medium text-gray-200">上传资料</p>
-              <p className="text-xs text-gray-500 mt-1">管理学习资料</p>
-            </div>
-          </Button>
-        </div>
-      </div>
-
-      {/* Placeholder charts area */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-200 mb-4">学习趋势</h2>
-        <Card className="border-white/[0.06]">
-          <CardHeader>
-            <CardTitle className="text-base text-gray-300">每周学习时长（分钟）</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-56">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={weeklyChartData}>
-                  <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
-                  <XAxis dataKey="day" tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 12 }} />
-                  <YAxis tick={{ fill: "rgba(255,255,255,0.45)", fontSize: 12 }} />
-                  <Tooltip
-                    contentStyle={{
-                      background: "rgba(15, 23, 42, 0.9)",
-                      border: "1px solid rgba(255,255,255,0.12)",
-                      color: "rgba(255,255,255,0.9)",
-                    }}
-                  />
-                  <Bar dataKey="minutes" fill="rgba(59, 130, 246, 0.85)" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            <WeeklyReportCard report={weeklyReport ?? undefined} />
           </CardContent>
-        </Card>
-      </div>
+        ) : null}
+      </Card>
     </div>
   );
 }

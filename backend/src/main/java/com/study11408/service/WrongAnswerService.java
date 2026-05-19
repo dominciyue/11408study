@@ -363,6 +363,8 @@ public class WrongAnswerService {
     @Transactional
     public int classifyPendingForUser(Long userId) {
         if (userId == null) return 0;
+        // 必经 AI 限流 — classifyOne 内部调 LLM，否则用户连点会耗 LLM 配额
+        aiRateLimiter.check(userId);
         List<WrongAnswer> pending = wrongAnswerRepository
                 .findTop3ByUserIdAndResolvedFalseAndErrorCategoryIsNullOrderByAnsweredAtDesc(userId);
         if (pending.isEmpty()) return 0;

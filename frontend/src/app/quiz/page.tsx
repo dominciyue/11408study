@@ -162,13 +162,14 @@ export default function QuizPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* 1 主 + 3 副布局：adaptive 头卡占满，其他三模式 3 列等宽 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {quizModes.map((mode) => (
           <Card
             key={mode.key}
             className={`border ${mode.borderColor} hover:scale-[1.01] transition-all duration-300 ${
               mode.key === "subject" ? "" : "cursor-pointer"
-            } group`}
+            } group ${mode.key === "adaptive" ? "md:col-span-3" : ""}`}
             onClick={() => handleModeClick(mode.key)}
           >
             <CardContent className="p-6">

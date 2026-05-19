@@ -15,7 +15,7 @@ import {
   ChevronDown,
   ChevronRight,
   GraduationCap,
-  Route,
+  MoreHorizontal,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -37,11 +37,15 @@ const navItems = [
   { name: "知识图谱", href: "/graph", icon: Network },
 ];
 
+// 一级（高频）：学习中心已涵盖 study/paths（在 /study 页内 4 模式之一），无需独立"专家路径"项
 const bottomNavItems = [
-  { name: "学习模式", href: "/study", icon: BookOpen },
-  { name: "专家路径", href: "/study/paths", icon: Route },
-  { name: "测验", href: "/quiz", icon: ClipboardCheck },
+  { name: "学习中心", href: "/study", icon: BookOpen },
+  { name: "测验中心", href: "/quiz", icon: ClipboardCheck },
   { name: "资料库", href: "/materials", icon: FolderOpen },
+];
+
+// 二级（低频）：折叠在"更多"展开
+const moreNavItems = [
   { name: "笔记", href: "/notes", icon: StickyNote },
   { name: "学习资源", href: "/resources", icon: Library },
 ];
@@ -50,6 +54,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [subjectsOpen, setSubjectsOpen] = useState(true);
+  const [moreOpen, setMoreOpen] = useState(false);
   const { user, logout } = useAuthStore();
 
   const isActive = (href: string) =>
@@ -160,6 +165,49 @@ export function Sidebar() {
             {!collapsed && <span>{item.name}</span>}
           </Link>
         ))}
+
+        {/* 更多 — 低频功能（笔记 / 学习资源）默认折叠 */}
+        <div className="pt-1">
+          <button
+            onClick={() => setMoreOpen(!moreOpen)}
+            className={cn(
+              "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-foreground/5 transition-all duration-200 cursor-pointer",
+              collapsed && "justify-center"
+            )}
+          >
+            <MoreHorizontal className="w-5 h-5 shrink-0" />
+            {!collapsed && (
+              <>
+                <span>更多</span>
+                <ChevronDown
+                  className={cn(
+                    "w-4 h-4 ml-auto transition-transform duration-200",
+                    !moreOpen && "-rotate-90"
+                  )}
+                />
+              </>
+            )}
+          </button>
+          {moreOpen && !collapsed && (
+            <div className="ml-4 mt-1 space-y-0.5 border-l border-sidebar-border pl-3">
+              {moreNavItems.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200",
+                    isActive(item.href)
+                      ? "bg-blue-600/15 text-blue-500 dark:text-blue-400"
+                      : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+                  )}
+                >
+                  <item.icon className="w-4 h-4 shrink-0" />
+                  <span>{item.name}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
       </nav>
 
       <Separator />

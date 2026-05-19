@@ -322,6 +322,13 @@ public class QuizService {
         QuizQuestion question = questionRepository.findById(request.getQuestionId())
                 .orElseThrow(() -> new BusinessException("题目不存在", HttpStatus.NOT_FOUND));
 
+        // 防御：link-based 占位题（content="[请前往外部页面...]" + answer="EXT_CORRECT"）
+        // 没法 in-app 作答。前端已不会调，但 API 仍可能被脚本/旧客户端 hit。
+        if (question.getExternalUrl() != null && !question.getExternalUrl().isBlank()) {
+            throw new BusinessException("外部链接题不支持直接提交，请到对应资源页查看",
+                    HttpStatus.UNPROCESSABLE_ENTITY);
+        }
+
         // 用 Objects.equals 避免 question.answer 为 null 时 NPE 500
         boolean correct = java.util.Objects.equals(question.getAnswer(), request.getUserAnswer());
 
