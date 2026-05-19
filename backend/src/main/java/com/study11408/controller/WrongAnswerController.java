@@ -55,6 +55,14 @@ public class WrongAnswerController {
         return ApiResponse.ok(wrongAnswerService.resolve(userId, id));
     }
 
+    @Operation(summary = "对未归类的未解决错题做 AI 病因分类(每次最多 3 条)")
+    @PostMapping("/classify-pending")
+    public ApiResponse<java.util.Map<String, Integer>> classifyPending(HttpServletRequest request) {
+        Long userId = getUserId(request);
+        int classified = wrongAnswerService.classifyPendingForUser(userId);
+        return ApiResponse.ok(java.util.Map.of("classified", classified));
+    }
+
     private Long getUserId(HttpServletRequest request) {
         String token = jwtTokenProvider.resolveToken(request);
         return jwtTokenProvider.getUserId(token);

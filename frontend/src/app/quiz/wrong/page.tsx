@@ -11,7 +11,7 @@ import {
   ListTree,
 } from "lucide-react";
 import { wrongAnswersApi } from "@/lib/api";
-import type { WrongAnswerGroup, WrongAnswerItem } from "@/types";
+import type { WrongAnswerGroup, WrongAnswerItem, WrongAnswerCategory } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,17 @@ import { SimilarQuestionsDrawer } from "@/components/wrong/SimilarQuestionsDrawe
  * 数据源：GET /api/wrong-answers → WrongAnswerGroup[]
  * 旧的 GET /quiz/wrong-answers 仍保留，但不在这里使用。
  */
+/** 病因配色 + 中文标签 — 与后端 5 类英文 key 对齐。 */
+const CATEGORY_META: Record<WrongAnswerCategory, { label: string; chip: string }> = {
+  CONCEPT_UNCLEAR: { label: "概念不清", chip: "bg-blue-500/15 text-blue-300 border border-blue-500/30" },
+  CALCULATION_ERROR: { label: "计算失误", chip: "bg-red-500/15 text-red-300 border border-red-500/30" },
+  MISREAD_QUESTION: { label: "审题偏差", chip: "bg-yellow-500/15 text-yellow-300 border border-yellow-500/30" },
+  KNOWLEDGE_GAP: { label: "知识盲区", chip: "bg-gray-500/15 text-gray-300 border border-gray-500/30" },
+  UNFAMILIAR_TYPE: { label: "题型陌生", chip: "bg-purple-500/15 text-purple-300 border border-purple-500/30" },
+};
+
+type Filter = WrongAnswerCategory | "ALL" | "UNCATEGORIZED";
+
 export default function WrongAnswersPage() {
   const [groups, setGroups] = useState<WrongAnswerGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,6 +44,8 @@ export default function WrongAnswersPage() {
   const [resolvingIds, setResolvingIds] = useState<Set<number>>(new Set());
   const [askingFor, setAskingFor] = useState<WrongAnswerItem | null>(null);
   const [similarFor, setSimilarFor] = useState<WrongAnswerItem | null>(null);
+  const [filter, setFilter] = useState<Filter>("ALL");
+  const [isClassifying, setIsClassifying] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,10 +73,75 @@ export default function WrongAnswersPage() {
     };
   }, [retryNonce]);
 
+  // 列表加载完后,如果还有未归类条目,后台 best-effort 触发 AI 归类。
+  // 完成后 bump retryNonce 让列表刷新拿到新 errorCategory。失败静默。
+  useEffect(() => {
+    if (isLoading) return;
+    const hasUnclassified = groups.some((g) =>
+      (g.items ?? []).some((it) => !it.errorCategory),
+    );
+    if (!hasUnclassified || isClassifying) return;
+    let cancelled = false;
+    setIsClassifying(true);
+    wrongAnswersApi
+      .classifyPending()
+      .then((res) => {
+        if (cancelled) return;
+        if ((res.data?.classified ?? 0) > 0) {
+          setRetryNonce((n) => n + 1); // 触发列表重拉,拿到 errorCategory
+        }
+      })
+      .catch(() => {
+        // 静默 — AI 失败不影响错题展示,下次访问还会重试
+      })
+      .finally(() => {
+        if (!cancelled) setIsClassifying(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // 列表内容变化时(retryNonce/isLoading)重新评估是否需要归类
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, retryNonce]);
+
   const totalItems = useMemo(
     () => groups.reduce((acc, g) => acc + (g.items?.length ?? 0), 0),
     [groups]
   );
+
+  // 病因维度计数,用于过滤 chips 显示数字。
+  const categoryCounts = useMemo(() => {
+    const counts: Record<Filter, number> = {
+      ALL: 0,
+      CONCEPT_UNCLEAR: 0,
+      CALCULATION_ERROR: 0,
+      MISREAD_QUESTION: 0,
+      KNOWLEDGE_GAP: 0,
+      UNFAMILIAR_TYPE: 0,
+      UNCATEGORIZED: 0,
+    };
+    for (const g of groups) {
+      for (const it of g.items ?? []) {
+        counts.ALL += 1;
+        if (it.errorCategory) counts[it.errorCategory] += 1;
+        else counts.UNCATEGORIZED += 1;
+      }
+    }
+    return counts;
+  }, [groups]);
+
+  // 按 filter 过滤 groups(过滤逐 item 后空 group 自动 dropdown)
+  const filteredGroups = useMemo(() => {
+    if (filter === "ALL") return groups;
+    return groups
+      .map((g) => {
+        const items = (g.items ?? []).filter((it) =>
+          filter === "UNCATEGORIZED" ? !it.errorCategory : it.errorCategory === filter,
+        );
+        return { ...g, items, wrongCount: items.length };
+      })
+      .filter((g) => (g.items?.length ?? 0) > 0);
+  }, [groups, filter]);
 
   function toggleNode(nodeId: number) {
     setCollapsedNodes((prev) => {
@@ -116,7 +194,63 @@ export default function WrongAnswersPage() {
             {groups.length} 个节点
           </Badge>
         ) : null}
+        {isClassifying ? (
+          <span className="text-xs text-gray-500 ml-auto flex items-center gap-1">
+            <Sparkles className="w-3 h-3 animate-pulse" />
+            AI 正在分析错因…
+          </span>
+        ) : null}
       </div>
+
+      {/* 病因过滤 chips — 只在有数据时显示 */}
+      {totalItems > 0 ? (
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <button
+            onClick={() => setFilter("ALL")}
+            className={
+              "px-2.5 py-1 rounded-full border transition-colors " +
+              (filter === "ALL"
+                ? "bg-white/15 border-white/30 text-gray-100"
+                : "bg-white/[0.04] border-white/[0.08] text-gray-400 hover:bg-white/10")
+            }
+          >
+            全部 ({categoryCounts.ALL})
+          </button>
+          {(["CONCEPT_UNCLEAR", "CALCULATION_ERROR", "MISREAD_QUESTION", "KNOWLEDGE_GAP", "UNFAMILIAR_TYPE"] as WrongAnswerCategory[]).map((cat) => {
+            const meta = CATEGORY_META[cat];
+            const count = categoryCounts[cat];
+            const active = filter === cat;
+            return (
+              <button
+                key={cat}
+                onClick={() => setFilter(active ? "ALL" : cat)}
+                disabled={count === 0}
+                className={
+                  "px-2.5 py-1 rounded-full transition-opacity " +
+                  meta.chip +
+                  (active ? " ring-2 ring-white/30" : "") +
+                  (count === 0 ? " opacity-40 cursor-not-allowed" : " cursor-pointer hover:opacity-90")
+                }
+                title={count === 0 ? "暂无此类错题" : `筛选 ${meta.label}`}
+              >
+                {meta.label} ({count})
+              </button>
+            );
+          })}
+          {categoryCounts.UNCATEGORIZED > 0 ? (
+            <button
+              onClick={() => setFilter(filter === "UNCATEGORIZED" ? "ALL" : "UNCATEGORIZED")}
+              className={
+                "px-2.5 py-1 rounded-full border border-dashed border-white/[0.12] text-gray-500 hover:bg-white/[0.05] " +
+                (filter === "UNCATEGORIZED" ? "ring-2 ring-white/30" : "")
+              }
+              title="尚未归类(AI 处理中或失败,刷新页面会重试)"
+            >
+              未归类 ({categoryCounts.UNCATEGORIZED})
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {isLoading ? (
         <Card className="border-white/[0.06]">
@@ -146,8 +280,15 @@ export default function WrongAnswersPage() {
             <p className="text-xs text-gray-500">坚持答题,做错的题会自动进入这里复习</p>
           </CardContent>
         </Card>
+      ) : filteredGroups.length === 0 ? (
+        <Card className="border-white/[0.06]">
+          <CardContent className="p-6 text-center space-y-2">
+            <p className="text-sm text-gray-300">当前筛选下没有错题</p>
+            <p className="text-xs text-gray-500">试试切换其他病因 chip 或回到"全部"</p>
+          </CardContent>
+        </Card>
       ) : (
-        groups.map((g) => {
+        filteredGroups.map((g) => {
           const collapsed = collapsedNodes.has(g.nodeId);
           return (
             <Card key={g.nodeId} className="border-white/[0.06]">
@@ -189,6 +330,17 @@ export default function WrongAnswersPage() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
+                          {w.errorCategory ? (
+                            <span
+                              className={
+                                "inline-block mb-2 px-2 py-0.5 text-[10px] rounded-full " +
+                                CATEGORY_META[w.errorCategory].chip
+                              }
+                              title="AI 自动归因"
+                            >
+                              {CATEGORY_META[w.errorCategory].label}
+                            </span>
+                          ) : null}
                           <div className="text-sm text-gray-200 whitespace-pre-wrap">
                             {w.questionText || `题目 #${w.questionId}`}
                           </div>

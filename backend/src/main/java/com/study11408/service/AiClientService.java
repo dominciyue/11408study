@@ -181,6 +181,44 @@ public class AiClientService {
         }
     }
 
+    /**
+     * 调用 ai-service `/ai/classify-wrong-answer` 给一条错题打 5 类病因之一。
+     * <p>AI 失败时返回 {error: ...},调用方应保持 errorCategory 为 null 待重试。
+     *
+     * @param questionText 题目正文(必填)
+     * @param options      选项列表(可空)
+     * @param correctAnswer 正确答案(必填)
+     * @param userAnswer   学生答案(必填)
+     * @param explanation  题目自带解析(可空)
+     * @return {category: <enum>, reason: <reason>} 或 {error: ...}
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> classifyWrongAnswer(
+            String questionText,
+            List<String> options,
+            String correctAnswer,
+            String userAnswer,
+            String explanation) {
+        try {
+            Map<String, Object> request = new HashMap<>();
+            request.put("question_text", questionText);
+            if (options != null && !options.isEmpty()) {
+                request.put("options", options);
+            }
+            request.put("correct_answer", correctAnswer == null ? "" : correctAnswer);
+            request.put("user_answer", userAnswer == null ? "" : userAnswer);
+            if (explanation != null && !explanation.isBlank()) {
+                request.put("explanation", explanation);
+            }
+            ResponseEntity<Map> response = restTemplate.postForEntity(
+                    aiServiceUrl + "/ai/classify-wrong-answer", request, Map.class);
+            return response.getBody();
+        } catch (RestClientException e) {
+            log.warn("AI 错题归类服务调用失败: {}", e.getMessage());
+            return Map.of("error", "AI服务暂不可用");
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public Map<String, Object> parsePdf(String fileUrl) {
         try {

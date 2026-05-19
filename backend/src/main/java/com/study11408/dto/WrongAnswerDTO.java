@@ -25,5 +25,8 @@ public class WrongAnswerDTO {
     private String topicName;
     /** 节点标题（前端展示出处更直观）。 */
     private String nodeTitle;
+    /** AI 归类的错误"病因"。5 类枚举之一(CONCEPT_UNCLEAR/CALCULATION_ERROR/MISREAD_QUESTION/
+     *  KNOWLEDGE_GAP/UNFAMILIAR_TYPE),null = 尚未归类。 */
+    private String errorCategory;
 }
 

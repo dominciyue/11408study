@@ -343,6 +343,72 @@ public class WrongAnswerService {
                 .resolved(w.getResolved())
                 .topicName(node != null && node.getTopic() != null ? node.getTopic().getName() : null)
                 .nodeTitle(node != null ? node.getTitle() : null)
+                .errorCategory(w.getErrorCategory())
                 .build();
+    }
+
+    /** 同步处理上限,防止一次性把 AI 服务打挂 */
+    private static final int CLASSIFY_BATCH_MAX = 3;
+
+    /**
+     * 给当前用户未归类的未解决错题打 AI 病因标签。每次最多处理 CLASSIFY_BATCH_MAX 条,
+     * 保持响应延迟在 5-10 秒内。
+     * <p>幂等:已归类(errorCategory NOT NULL)的条目跳过。
+     * <p>best-effort:AI 失败时该条目保持 null,下次调用还会再试。
+     *
+     * @return 本次实际归类的条目数
+     */
+    @Transactional
+    public int classifyPendingForUser(Long userId) {
+        if (userId == null) return 0;
+        List<WrongAnswer> pending = wrongAnswerRepository
+                .findTop3ByUserIdAndResolvedFalseAndErrorCategoryIsNullOrderByAnsweredAtDesc(userId);
+        if (pending.isEmpty()) return 0;
+        int classified = 0;
+        for (WrongAnswer w : pending) {
+            String cat = classifyOne(w);
+            if (cat != null) {
+                w.setErrorCategory(cat);
+                wrongAnswerRepository.save(w);
+                classified++;
+            }
+            if (classified >= CLASSIFY_BATCH_MAX) break;
+        }
+        log.info("classifyPendingForUser uid={} classified={}/{}", userId, classified, pending.size());
+        return classified;
+    }
+
+    /**
+     * 调用 AI 对单条错题归类。返回 null 表示 AI 不可用或解析失败,调用方应保留 null 让下次重试。
+     */
+    private String classifyOne(WrongAnswer w) {
+        if (w == null || w.getQuestion() == null) return null;
+        QuizQuestion q = w.getQuestion();
+        List<String> opts = parseOptions(q.getOptions());
+        Map<String, Object> resp = aiClientService.classifyWrongAnswer(
+                strOrEmpty(q.getContent()),
+                opts,
+                strOrEmpty(q.getAnswer()),
+                strOrEmpty(w.getUserAnswer()),
+                q.getExplanation());
+        if (resp == null || resp.containsKey("error")) return null;
+        Object cat = resp.get("category");
+        if (!(cat instanceof String s) || s.isBlank()) return null;
+        // 白名单防御 — 即便 AI 输出乱来也不会写脏数据
+        Set<String> allowed = Set.of(
+                "CONCEPT_UNCLEAR", "CALCULATION_ERROR",
+                "MISREAD_QUESTION", "KNOWLEDGE_GAP", "UNFAMILIAR_TYPE");
+        return allowed.contains(s) ? s : null;
+    }
+
+    /** 把 jsonb options 字段解析成 List<String>;为空 / 解析失败返回空 list。 */
+    private List<String> parseOptions(String optionsJson) {
+        if (optionsJson == null || optionsJson.isBlank()) return Collections.emptyList();
+        try {
+            return objectMapper.readValue(
+                    optionsJson, objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
     }
 }

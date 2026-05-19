@@ -280,6 +280,14 @@ export const wrongAnswersApi = {
     api.post<unknown, ApiResponse<WrongAnswerItem>>(
       `/wrong-answers/${wrongAnswerId}/resolve`
     ),
+  /** 触发未归类错题的 AI 病因归类(每次最多 3 条)。返回本次实际归类条数。
+   *  AI 调用 5-15s,timeout 给宽点;失败时该批保留 null 等下次重试。 */
+  classifyPending: () =>
+    api.post<unknown, ApiResponse<{ classified: number }>>(
+      "/wrong-answers/classify-pending",
+      undefined,
+      { timeout: 60000 }
+    ),
 };
 
 export default api;

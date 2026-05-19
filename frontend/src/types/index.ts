@@ -204,6 +204,13 @@ export interface WrongAnswer {
  * <p>resolved 在 Java 是 Boolean（可空），但实际所有 service 调用都填值，
  * 因此前端按 boolean 处理；如未来后端可能省略字段，可改 boolean | undefined。
  */
+export type WrongAnswerCategory =
+  | "CONCEPT_UNCLEAR"
+  | "CALCULATION_ERROR"
+  | "MISREAD_QUESTION"
+  | "KNOWLEDGE_GAP"
+  | "UNFAMILIAR_TYPE";
+
 export interface WrongAnswerItem {
   id: number;
   questionId: number;
@@ -216,6 +223,8 @@ export interface WrongAnswerItem {
   resolved: boolean;
   topicName?: string;
   nodeTitle?: string;
+  /** AI 归类的错误"病因",null = 尚未归类 */
+  errorCategory?: WrongAnswerCategory | null;
 }
 
 /**

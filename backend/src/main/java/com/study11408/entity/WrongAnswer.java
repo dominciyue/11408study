@@ -47,4 +47,9 @@ public class WrongAnswer {
     /** 已纳入 SM-2 复习队列的时刻；NULL = 尚未入队（同题第 1 次错误时记录但不入队） */
     @Column(name = "enqueued_at")
     private LocalDateTime enqueuedAt;
+
+    /** AI 归类的错误"病因"。固定 5 类枚举(英文 key)。NULL = 尚未归类 / AI 失败。
+     *  CONCEPT_UNCLEAR / CALCULATION_ERROR / MISREAD_QUESTION / KNOWLEDGE_GAP / UNFAMILIAR_TYPE */
+    @Column(name = "error_category", length = 50)
+    private String errorCategory;
 }

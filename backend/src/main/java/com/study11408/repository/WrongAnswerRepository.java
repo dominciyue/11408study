@@ -42,6 +42,26 @@ public interface WrongAnswerRepository extends JpaRepository<WrongAnswer, Long> 
     /** 错题本列表 / 分页 — 按答错时间倒序 */
     Page<WrongAnswer> findByUserIdAndResolvedFalseOrderByAnsweredAtDesc(Long userId, Pageable pageable);
 
+    /** 拉未归类的未解决错题 Top3 — 用于 /wrong-answers/classify-pending 同步归类。
+     *  Top3 是 Spring Data 的 first-N 语法,生成 LIMIT 3。带 question fetch 避免 toDto N+1。 */
+    @Query("""
+            SELECT w FROM WrongAnswer w
+            LEFT JOIN FETCH w.question q
+            LEFT JOIN FETCH q.node n
+            LEFT JOIN FETCH n.topic t
+            WHERE w.userId = :userId
+              AND w.resolved = false
+              AND w.errorCategory IS NULL
+            ORDER BY w.answeredAt DESC
+            """)
+    List<WrongAnswer> findUnclassifiedTop(@Param("userId") Long userId, Pageable pageable);
+
+    /** 简化版 — controller 不用关心 Pageable,直接拿固定 3 条。 */
+    default List<WrongAnswer>
+    findTop3ByUserIdAndResolvedFalseAndErrorCategoryIsNullOrderByAnsweredAtDesc(Long userId) {
+        return findUnclassifiedTop(userId, org.springframework.data.domain.PageRequest.of(0, 3));
+    }
+
     /**
      * 一次性把"已记录但还没入队"的同题错误全部 mark 上时间戳，
      * 避免后续答错再触发入队。

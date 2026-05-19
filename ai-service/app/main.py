@@ -15,6 +15,7 @@ from app.routers import (
     pdf_parse,
     quiz_explain,
     study_plan,
+    wrong_answer_classify,
 )
 
 logging.basicConfig(
@@ -73,6 +74,7 @@ app.include_router(content_enhance.router, prefix="/ai", tags=["内容增强"])
 app.include_router(pdf_parse.router, prefix="/ai", tags=["PDF解析"])
 app.include_router(quiz_explain.router, prefix="/ai", tags=["AI讲题"])
 app.include_router(study_plan.router, prefix="/ai", tags=["AI学习计划"])
+app.include_router(wrong_answer_classify.router, prefix="/ai", tags=["错题归类"])
 
 # Prometheus metrics — 自动暴露 http_requests_total / http_request_duration_seconds 等
 # 端点：GET /metrics  (Prometheus 在 docker 内网拉，无需鉴权)
