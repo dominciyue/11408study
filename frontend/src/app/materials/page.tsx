@@ -315,23 +315,22 @@ export default function MaterialsPage() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0"
-                    title="查看"
-                    onClick={() => {
-                      if (material.fileUrl) {
-                        window.open(material.fileUrl, "_blank");
-                      } else {
-                        alert("该资料尚未上传文件");
-                      }
-                    }}
+                    className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0 disabled:opacity-40"
+                    title={material.fileUrl ? "查看" : "暂无文件"}
+                    aria-label={material.fileUrl ? "查看资料" : "暂无文件"}
+                    disabled={!material.fileUrl}
+                    onClick={() => window.open(material.fileUrl!, "_blank")}
                   >
                     <Eye className="w-4 h-4" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0"
-                    onClick={() => window.open(material.fileUrl, "_blank")}
+                    className="text-gray-500 hover:text-gray-300 h-8 w-8 p-0 disabled:opacity-40"
+                    title={material.fileUrl ? "在新标签页打开" : "暂无文件"}
+                    aria-label={material.fileUrl ? "在新标签页打开" : "暂无文件"}
+                    disabled={!material.fileUrl}
+                    onClick={() => window.open(material.fileUrl!, "_blank")}
                   >
                     <ExternalLink className="w-4 h-4" />
                   </Button>

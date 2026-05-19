@@ -27,6 +27,8 @@ import { SimilarQuestionsDrawer } from "@/components/wrong/SimilarQuestionsDrawe
 export default function WrongAnswersPage() {
   const [groups, setGroups] = useState<WrongAnswerGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
   const [collapsedNodes, setCollapsedNodes] = useState<Set<number>>(new Set());
   const [resolvingIds, setResolvingIds] = useState<Set<number>>(new Set());
   const [askingFor, setAskingFor] = useState<WrongAnswerItem | null>(null);
@@ -35,13 +37,20 @@ export default function WrongAnswersPage() {
   useEffect(() => {
     let cancelled = false;
     setIsLoading(true);
+    setLoadError(null);
     wrongAnswersApi
       .list()
       .then((res) => {
         if (!cancelled) setGroups(res.data ?? []);
       })
-      .catch(() => {
-        if (!cancelled) setGroups([]);
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setGroups([]);
+        const msg =
+          (err && typeof err === "object" && "message" in err && typeof err.message === "string"
+            ? err.message
+            : "") || "加载错题本失败,请检查网络";
+        setLoadError(msg);
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
@@ -49,7 +58,7 @@ export default function WrongAnswersPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retryNonce]);
 
   const totalItems = useMemo(
     () => groups.reduce((acc, g) => acc + (g.items?.length ?? 0), 0),
@@ -113,9 +122,29 @@ export default function WrongAnswersPage() {
         <Card className="border-white/[0.06]">
           <CardContent className="p-6 text-gray-500">加载中…</CardContent>
         </Card>
+      ) : loadError ? (
+        <Card className="border-red-500/30 bg-red-500/5">
+          <CardContent className="flex flex-col gap-3 p-6">
+            <div className="text-sm text-red-300">
+              <p className="font-medium">加载错题本失败</p>
+              <p className="mt-1 text-xs text-red-400/80">{loadError}</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="self-start border-red-500/30 text-red-300 hover:bg-red-500/10"
+              onClick={() => setRetryNonce((n) => n + 1)}
+            >
+              重试
+            </Button>
+          </CardContent>
+        </Card>
       ) : groups.length === 0 ? (
         <Card className="border-white/[0.06]">
-          <CardContent className="p-6 text-gray-500">暂无错题。</CardContent>
+          <CardContent className="p-6 text-center space-y-2">
+            <p className="text-sm text-gray-300">暂无错题</p>
+            <p className="text-xs text-gray-500">坚持答题,做错的题会自动进入这里复习</p>
+          </CardContent>
         </Card>
       ) : (
         groups.map((g) => {

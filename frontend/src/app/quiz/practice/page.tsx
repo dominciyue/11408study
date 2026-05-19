@@ -369,23 +369,36 @@ function QuizPracticeInner() {
                 </>
               ) : (
                 <>
-                  <div className="grid gap-2">
-                    {(options.length ? options : ["(无选项，直接填空作答)"]).map((opt) => (
-                      <Button
-                        key={opt}
-                        variant="outline"
-                        className={
-                          selected === opt
-                            ? "border-blue-500/40 bg-blue-500/10 text-blue-200 justify-start"
-                            : "border-white/[0.08] hover:bg-white/10 text-gray-200 justify-start"
-                        }
-                        onClick={() => setSelected(opt)}
+                  {options.length === 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-500">本题无预置选项,请直接输入答案</p>
+                      <textarea
+                        className="w-full min-h-[88px] bg-white/[0.04] border border-white/[0.08] rounded-lg p-3 text-sm text-gray-200 placeholder:text-gray-600 focus:border-blue-500/40 focus:outline-none disabled:opacity-60"
+                        placeholder="输入答案..."
+                        value={selected ?? ""}
+                        onChange={(e) => setSelected(e.target.value || null)}
                         disabled={!!result}
-                      >
-                        {opt}
-                      </Button>
-                    ))}
-                  </div>
+                      />
+                    </div>
+                  ) : (
+                    <div className="grid gap-2">
+                      {options.map((opt) => (
+                        <Button
+                          key={opt}
+                          variant="outline"
+                          className={
+                            selected === opt
+                              ? "border-blue-500/40 bg-blue-500/10 text-blue-200 justify-start"
+                              : "border-white/[0.08] hover:bg-white/10 text-gray-200 justify-start"
+                          }
+                          onClick={() => setSelected(opt)}
+                          disabled={!!result}
+                        >
+                          {opt}
+                        </Button>
+                      ))}
+                    </div>
+                  )}
 
                   <div className="flex gap-2">
                     <Button

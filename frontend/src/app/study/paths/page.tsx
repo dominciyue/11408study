@@ -94,6 +94,7 @@ export default function StudyPathsListPage() {
   const [activeTab, setActiveTab] = useState<TabKey>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   // 拉学科列表（用于 Tab 名称兜底）
   useEffect(() => {
@@ -133,7 +134,7 @@ export default function StudyPathsListPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab]);
+  }, [activeTab, retryNonce]);
 
   // 默认 Tab 顺序：全部 / 政治 / 英语一 / 数学一 / 408
   const tabs = useMemo<{ key: TabKey; label: string; tone: Tone }[]>(() => {
@@ -226,7 +227,7 @@ export default function StudyPathsListPage() {
                 size="sm"
                 variant="outline"
                 className="mt-3 border-red-500/30 text-red-300 hover:bg-red-500/10"
-                onClick={() => setActiveTab((prev) => prev)}
+                onClick={() => setRetryNonce((n) => n + 1)}
               >
                 重试
               </Button>

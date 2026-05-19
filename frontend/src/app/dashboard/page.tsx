@@ -139,35 +139,67 @@ export default function DashboardPage() {
           <TrendingUp className="w-5 h-5 text-blue-500 dark:text-blue-400" />
           学科进度
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {(overview?.subjectProgress ?? []).map((subject) => (
-            <Card
-              key={subject.code}
-              className="border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-white/[0.02] hover:border-white/[0.16] transition-all duration-300 cursor-pointer"
-              onClick={() => router.push(`/subjects/${subject.subjectId}`)}
-            >
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-100">{subject.name}</h3>
-                  <span className="text-sm text-gray-400">
-                    {subject.studiedNodes}/{subject.totalNodes}
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">已掌握 {subject.masteredNodes} 个</span>
-                    <span className="text-gray-200">{subject.progress}%</span>
+        {(overview?.subjectProgress ?? []).length === 0 ? (
+          <Card className="border-white/[0.06] bg-white/[0.02]">
+            <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+              <BookOpen className="w-10 h-10 text-gray-600 mb-3" />
+              <p className="text-sm text-gray-300">还没有学科进度</p>
+              <p className="text-xs text-gray-500 mt-1">
+                先上传教材或在知识图谱里学习,这里会显示各科的掌握情况
+              </p>
+              <div className="flex gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/[0.08] text-gray-200 hover:bg-white/10"
+                  onClick={() => router.push("/materials")}
+                >
+                  <Upload className="w-4 h-4 mr-1.5" />
+                  上传资料
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-white/[0.08] text-gray-200 hover:bg-white/10"
+                  onClick={() => router.push("/study")}
+                >
+                  <BookOpen className="w-4 h-4 mr-1.5" />
+                  开始学习
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(overview?.subjectProgress ?? []).map((subject) => (
+              <Card
+                key={subject.code}
+                className="border border-white/[0.08] bg-gradient-to-br from-white/[0.06] to-white/[0.02] hover:border-white/[0.16] transition-all duration-300 cursor-pointer"
+                onClick={() => router.push(`/subjects/${subject.subjectId}`)}
+              >
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-100">{subject.name}</h3>
+                    <span className="text-sm text-gray-400">
+                      {subject.studiedNodes}/{subject.totalNodes}
+                    </span>
                   </div>
-                  <Progress
-                    value={subject.progress}
-                    className="h-2"
-                    indicatorClassName="bg-blue-500"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">已掌握 {subject.masteredNodes} 个</span>
+                      <span className="text-gray-200">{subject.progress}%</span>
+                    </div>
+                    <Progress
+                      value={subject.progress}
+                      className="h-2"
+                      indicatorClassName="bg-blue-500"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Quick actions */}
