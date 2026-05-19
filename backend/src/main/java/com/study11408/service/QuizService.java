@@ -50,7 +50,8 @@ public class QuizService {
 
     @Transactional(readOnly = true)
     public List<QuizQuestion> generateQuiz(List<Long> nodeIds, int count) {
-        List<QuizQuestion> questions = questionRepository.findRandomByNodeIds(nodeIds, count);
+        // 答题主流程排除 link-based 占位题（content="[请前往外部页面...]"）
+        List<QuizQuestion> questions = questionRepository.findRandomInlineByNodeIds(nodeIds, count);
         if (questions.isEmpty()) {
             return questions;
         }
@@ -310,7 +311,8 @@ public class QuizService {
         log.info("AdaptiveGenerate userId={} subject={} buckets A={}/B={}/C={} -> finalIds={} count={}",
                 userId, subjectId, bucketA.size(), bucketB.size(), bucketC.size(),
                 finalIds.size(), count);
-        return questionRepository.findRandomByNodeIds(finalIds, count);
+        // 排除 link-based 占位题（仅 in-app 可作答的完整题进入推荐）
+        return questionRepository.findRandomInlineByNodeIds(finalIds, count);
     }
 
     @Transactional

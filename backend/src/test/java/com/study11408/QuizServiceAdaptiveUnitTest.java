@@ -99,7 +99,7 @@ class QuizServiceAdaptiveUnitTest {
         assertThatThrownBy(() -> service.adaptiveGenerate(USER_ID, SUBJECT_ID, 10))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("用户不存在");
-        verify(questionRepository, never()).findRandomByNodeIds(any(), anyInt());
+        verify(questionRepository, never()).findRandomInlineByNodeIds(any(), anyInt());
     }
 
     @Test
@@ -116,7 +116,7 @@ class QuizServiceAdaptiveUnitTest {
         // subject=null → bucket C 不填充
         List<QuizQuestion> result = service.adaptiveGenerate(USER_ID, null, 10);
         assertThat(result).isEmpty();
-        verify(questionRepository, never()).findRandomByNodeIds(any(), anyInt());
+        verify(questionRepository, never()).findRandomInlineByNodeIds(any(), anyInt());
     }
 
     @Test
@@ -136,14 +136,14 @@ class QuizServiceAdaptiveUnitTest {
         when(progressRepository.findByUserIdWithNodeSubject(USER_ID))
                 .thenReturn(List.of(p1, p2));
         when(nodeRepository.findByTopicSubjectId(SUBJECT_ID)).thenReturn(List.of(n1, n2));
-        when(questionRepository.findRandomByNodeIds(any(), anyInt()))
+        when(questionRepository.findRandomInlineByNodeIds(any(), anyInt()))
                 .thenReturn(List.of());
 
         service.adaptiveGenerate(USER_ID, SUBJECT_ID, 10);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Long>> captor = ArgumentCaptor.forClass(List.class);
-        verify(questionRepository).findRandomByNodeIds(captor.capture(), eq(10));
+        verify(questionRepository).findRandomInlineByNodeIds(captor.capture(), eq(10));
         List<Long> ids = captor.getValue();
         // n1 (bucket A) 排在 n2 (bucket B) 前
         assertThat(ids.indexOf(101L)).isLessThan(ids.indexOf(102L));
@@ -164,14 +164,14 @@ class QuizServiceAdaptiveUnitTest {
                 .thenReturn(List.of(p));
         when(nodeRepository.findByTopicSubjectId(SUBJECT_ID))
                 .thenReturn(List.of(studied, brandNew));
-        when(questionRepository.findRandomByNodeIds(any(), anyInt()))
+        when(questionRepository.findRandomInlineByNodeIds(any(), anyInt()))
                 .thenReturn(List.of());
 
         service.adaptiveGenerate(USER_ID, SUBJECT_ID, 5);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Long>> captor = ArgumentCaptor.forClass(List.class);
-        verify(questionRepository).findRandomByNodeIds(captor.capture(), eq(5));
+        verify(questionRepository).findRandomInlineByNodeIds(captor.capture(), eq(5));
         List<Long> ids = captor.getValue();
         assertThat(ids).contains(201L, 202L);
         assertThat(ids.indexOf(201L)).isLessThan(ids.indexOf(202L)); // B before C
@@ -195,14 +195,14 @@ class QuizServiceAdaptiveUnitTest {
                 .thenReturn(List.of(p1, p2));
         when(nodeRepository.findByTopicSubjectId(SUBJECT_ID))
                 .thenReturn(List.of(inSubject));
-        when(questionRepository.findRandomByNodeIds(any(), anyInt()))
+        when(questionRepository.findRandomInlineByNodeIds(any(), anyInt()))
                 .thenReturn(List.of());
 
         service.adaptiveGenerate(USER_ID, SUBJECT_ID, 10);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Long>> captor = ArgumentCaptor.forClass(List.class);
-        verify(questionRepository).findRandomByNodeIds(captor.capture(), eq(10));
+        verify(questionRepository).findRandomInlineByNodeIds(captor.capture(), eq(10));
         // 只应包含 SUBJECT_ID 下的 301，不应有跨学科的 302
         assertThat(captor.getValue()).contains(301L).doesNotContain(302L);
     }
@@ -221,14 +221,14 @@ class QuizServiceAdaptiveUnitTest {
         when(userRepository.existsById(USER_ID)).thenReturn(true);
         when(progressRepository.findByUserIdWithNodeSubject(USER_ID))
                 .thenReturn(List.of(pNewer, pOlder));
-        when(questionRepository.findRandomByNodeIds(any(), anyInt()))
+        when(questionRepository.findRandomInlineByNodeIds(any(), anyInt()))
                 .thenReturn(List.of());
 
         service.adaptiveGenerate(USER_ID, null, 10);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<Long>> captor = ArgumentCaptor.forClass(List.class);
-        verify(questionRepository).findRandomByNodeIds(captor.capture(), eq(10));
+        verify(questionRepository).findRandomInlineByNodeIds(captor.capture(), eq(10));
         List<Long> ids = captor.getValue();
         assertThat(ids.indexOf(401L)).isLessThan(ids.indexOf(402L)); // 3 天前到期排在 1 小时前
     }

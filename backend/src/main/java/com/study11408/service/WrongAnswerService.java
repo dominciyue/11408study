@@ -175,10 +175,12 @@ public class WrongAnswerService {
         excludeIds.add(srcQuestion.getId());
 
         // bucket 与 bucketIds 同步维护，把第 2/3 档的 O(N²) noneMatch 降到 O(1) Set 查询
+        // 同时手动过滤 link-based（findByNodeId 是 Spring derived，没法在 query 加 WHERE）
         List<QuizQuestion> bucket = new ArrayList<>();
         Set<Long> bucketIds = new HashSet<>();
         for (QuizQuestion q : quizQuestionRepository.findByNodeId(node.getId())) {
             if (excludeIds.contains(q.getId())) continue;
+            if (q.getExternalUrl() != null && !q.getExternalUrl().isBlank()) continue;
             if (bucketIds.add(q.getId())) bucket.add(q);
         }
         String source = "DB_NODE";
